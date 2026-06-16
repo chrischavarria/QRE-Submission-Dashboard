@@ -176,6 +176,12 @@ textarea {
   color: var(--accent-dark);
 }
 
+.status-banner.warning {
+  border: 1px solid rgba(183, 110, 0, 0.3);
+  background: #fff4df;
+  color: var(--warning);
+}
+
 .eyebrow {
   color: var(--muted);
   font-size: 12px;
@@ -564,6 +570,11 @@ textarea {
 .metrics-toolbar {
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.metrics-subheading {
+  margin-top: 22px;
+  margin-bottom: 12px;
 }
 
 .metric-cards {

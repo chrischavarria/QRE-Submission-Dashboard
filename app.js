@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -120,7 +120,12 @@ const els = {
   qreItems: document.querySelector("#qreItems"),
   metricMonth: document.querySelector("#metricMonth"),
   metricCards: document.querySelector("#metricCards"),
-  metricTableBody: document.querySelector("#metricTable tbody")
+  metricTableBody: document.querySelector("#metricTable tbody"),
+  trendTableBody: document.querySelector("#trendTable tbody"),
+  trendRange: document.querySelector("#trendRange"),
+  trendMonthOne: document.querySelector("#trendMonthOne"),
+  trendMonthTwo: document.querySelector("#trendMonthTwo"),
+  trendMonthThree: document.querySelector("#trendMonthThree")
 };
 
 init();
@@ -336,8 +341,9 @@ async function onSubmitVariance(event) {
         showStatus(error.message, "error");
         return;
       }
-      await notifySlack({ type: "submitted", record: payload });
+      const slackResult = await notifySlack({ type: "submitted", record: payload });
       await loadRecords();
+      payload.slackResult = slackResult;
     } else {
       const next = [{ ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...state.records];
       state.records = next;
@@ -348,7 +354,8 @@ async function onSubmitVariance(event) {
     setDefaultDates();
     syncAllOtherFields();
     render();
-    showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
+    const slackMessage = payload.slackResult?.ok ? " Slack notification sent." : ` Slack notification not sent: ${payload.slackResult?.reason || "function not available"}.`;
+    showStatus(`Variance submitted successfully. It is now in Pharmacist Review.${slackMessage}`, payload.slackResult?.ok ? "success" : "warning", { persist: true });
   } finally {
     state.isSubmittingVariance = false;
     setVarianceSubmitState(false);
@@ -406,7 +413,10 @@ async function onApprove(event) {
   };
 
   await persistUpdate(record.id, update);
-  await notifySlack({ type: "approved", record: { ...record, ...update } });
+  const slackResult = await notifySlack({ type: "approved", record: { ...record, ...update } });
+  if (!slackResult.ok) {
+    showStatus(`Approved, but Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
+  }
   state.selectedApprovedId = record.id;
   state.selectedRecordId = null;
   els.reviewForm.reset();
@@ -464,8 +474,16 @@ async function deleteSubmission(id) {
 }
 
 async function notifySlack(payload) {
-  if (!state.supabase) return;
-  await state.supabase.functions.invoke("slack-notify", { body: payload });
+  if (!state.supabase) return { ok: false, reason: "Supabase is not connected" };
+
+  try {
+    const { data, error } = await state.supabase.functions.invoke("slack-notify", { body: payload });
+    if (error) return { ok: false, reason: error.message || "Edge Function error" };
+    if (!data?.ok) return { ok: false, reason: data?.reason || "Slack rejected the notification" };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error.message || "Unable to call Slack function" };
+  }
 }
 
 function requirePharmacist() {
@@ -880,6 +898,7 @@ function syncAllOtherFields() {
 function renderMetrics() {
   if (!state.user) return;
   const month = els.metricMonth.value;
+  const trendMonths = getThreeMonthRange(month);
   const approved = state.records.filter((record) => {
     return record.status === "approved" && (!month || (record.event_date || "").startsWith(month));
   });
@@ -915,6 +934,8 @@ function renderMetrics() {
       <td>${escapeHtml(row.trend)}</td>
     </tr>`)
     .join("");
+
+  renderTrendTable(trendMonths);
 }
 
 function includesMetricItem(values, item) {
@@ -927,9 +948,95 @@ function documentationRate(records) {
   return `${complete}/${records.length} complete`;
 }
 
+function renderTrendTable(months) {
+  const approved = state.records.filter((record) => record.status === "approved");
+  els.trendMonthOne.textContent = formatMonthLabel(months[0]);
+  els.trendMonthTwo.textContent = formatMonthLabel(months[1]);
+  els.trendMonthThree.textContent = formatMonthLabel(months[2]);
+  els.trendRange.textContent = `${formatMonthLabel(months[0])} - ${formatMonthLabel(months[2])}`;
+
+  const rows = [];
+  Object.entries(QRE_CATEGORIES).forEach(([key, category]) => {
+    category.items.forEach((item) => {
+      const counts = months.map((monthKey) => {
+        return approved.filter((record) => {
+          return (record.event_date || "").startsWith(monthKey) &&
+            record.qre_category === key &&
+            includesMetricItem(record.qre_items || [], item);
+        }).length;
+      });
+
+      if (counts.some((count) => count > 0)) {
+        rows.push({
+          category: category.label,
+          item,
+          counts,
+          trend: trendLabel(counts)
+        });
+      }
+    });
+  });
+
+  els.trendTableBody.innerHTML = rows.length
+    ? rows.map((row) => `<tr>
+        <td>${escapeHtml(row.category)}</td>
+        <td>${escapeHtml(row.item)}</td>
+        <td>${row.counts[0]}</td>
+        <td>${row.counts[1]}</td>
+        <td>${row.counts[2]}</td>
+        <td>${escapeHtml(row.trend)}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="6">No approved QRE metrics in this 3-month range.</td></tr>`;
+}
+
+function getThreeMonthRange(selectedMonth) {
+  const base = selectedMonth ? new Date(`${selectedMonth}-01T00:00:00`) : new Date();
+  base.setDate(1);
+  return [-2, -1, 0].map((offset) => {
+    const date = new Date(base);
+    date.setMonth(base.getMonth() + offset);
+    return monthKey(date);
+  });
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(month) {
+  const date = new Date(`${month}-01T00:00:00`);
+  return date.toLocaleString(undefined, { month: "short", year: "numeric" });
+}
+
+function trendLabel(counts) {
+  const [first, second, third] = counts;
+  if (first === 0 && second === 0 && third > 0) return "New this month";
+  if (third > second && second >= first) return "Increasing";
+  if (third < second && second <= first) return "Decreasing";
+  if (third > Math.max(first, second)) return "Up vs prior months";
+  if (third < Math.min(first, second)) return "Down vs prior months";
+  return "Stable";
+}
+
 function exportMetricsCsv() {
-  const rows = [["Category", "Metric", "Count", "Documentation", "Trend status"]];
+  const rows = [
+    ["Monthly Metrics"],
+    ["Category", "Metric", "Count", "Documentation", "Trend status"]
+  ];
   els.metricTableBody.querySelectorAll("tr").forEach((tr) => {
+    rows.push([...tr.children].map((td) => td.textContent));
+  });
+  rows.push([]);
+  rows.push(["3-Month Trends"]);
+  rows.push([
+    "Category",
+    "Metric",
+    els.trendMonthOne.textContent,
+    els.trendMonthTwo.textContent,
+    els.trendMonthThree.textContent,
+    "Trend"
+  ]);
+  els.trendTableBody.querySelectorAll("tr").forEach((tr) => {
     rows.push([...tr.children].map((td) => td.textContent));
   });
   const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
