@@ -331,6 +331,11 @@ textarea {
   width: auto;
 }
 
+.conditional-field {
+  margin-top: 10px;
+  max-width: 520px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

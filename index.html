@@ -84,6 +84,10 @@
                 Department
                 <select name="department" required></select>
               </label>
+              <label class="conditional-field hidden" data-other-field="department">
+                Other department
+                <input name="department_other" type="text" />
+              </label>
 
               <fieldset>
                 <legend>Patient involved?</legend>
@@ -111,11 +115,19 @@
               <fieldset class="wide">
                 <legend>Nature of variance</legend>
                 <div class="check-grid" data-checkboxes="nature"></div>
+                <label class="conditional-field hidden" data-other-field="nature">
+                  Other nature
+                  <input name="nature_other" type="text" />
+                </label>
               </fieldset>
 
               <fieldset class="wide">
                 <legend>Source of complaint</legend>
                 <div class="check-grid" data-checkboxes="source"></div>
+                <label class="conditional-field hidden" data-other-field="source">
+                  Other source
+                  <input name="source_other" type="text" />
+                </label>
               </fieldset>
 
               <label class="wide">
@@ -147,11 +159,19 @@
               <fieldset class="wide">
                 <legend>Incorrect / issue with</legend>
                 <div class="check-grid" data-checkboxes="issue"></div>
+                <label class="conditional-field hidden" data-other-field="issue">
+                  Other issue
+                  <input name="issue_other" type="text" />
+                </label>
               </fieldset>
 
               <fieldset class="wide">
                 <legend>Failure to identify and manage</legend>
                 <div class="check-grid" data-checkboxes="failure"></div>
+                <label class="conditional-field hidden" data-other-field="failure">
+                  Other failure
+                  <input name="failure_other" type="text" />
+                </label>
               </fieldset>
 
               <label class="wide">
@@ -223,10 +243,18 @@
                 <fieldset class="wide">
                   <legend>QRE metric items</legend>
                   <div class="check-grid" id="qreItems"></div>
+                  <label class="conditional-field hidden" data-other-field="qre_items">
+                    Other QRE metric
+                    <input name="qre_items_other" type="text" />
+                  </label>
                 </fieldset>
                 <label>
                   Department notification
                   <select name="review_department" required></select>
+                </label>
+                <label class="conditional-field hidden" data-other-field="review_department">
+                  Other notification department
+                  <input name="review_department_other" type="text" />
                 </label>
                 <label>
                   Pharmacist notes

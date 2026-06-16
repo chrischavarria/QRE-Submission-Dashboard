@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -162,6 +162,7 @@ function bindEvents() {
   els.reviewForm.addEventListener("submit", onApprove);
   document.querySelector("#rejectButton").addEventListener("click", onReject);
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
+  document.addEventListener("change", onOtherControlChange);
   els.metricMonth.addEventListener("change", renderMetrics);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
 }
@@ -171,6 +172,29 @@ function setDefaultDates() {
   els.varianceForm.elements.event_date.value = today.toISOString().slice(0, 10);
   els.varianceForm.elements.event_time.value = today.toTimeString().slice(0, 5);
   els.metricMonth.value = today.toISOString().slice(0, 7);
+}
+
+function onOtherControlChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+
+  if (target.type === "checkbox" && target.value === "Other") {
+    syncOtherField(target.name, target.checked);
+  }
+
+  if (target.tagName === "SELECT") {
+    syncOtherField(target.name, target.value === "Other");
+  }
+}
+
+function syncOtherField(name, isVisible) {
+  const field = document.querySelector(`[data-other-field="${name}"]`);
+  if (!field) return;
+
+  const input = field.querySelector("input");
+  field.classList.toggle("hidden", !isVisible);
+  input.required = isVisible;
+  if (!isVisible) input.value = "";
 }
 
 async function connectSupabase() {
@@ -292,6 +316,7 @@ async function onSubmitVariance(event) {
 
   event.currentTarget.reset();
   setDefaultDates();
+  syncAllOtherFields();
   render();
   showStatus("Variance submitted successfully.", "success");
 }
@@ -302,19 +327,19 @@ function formToVariance(form) {
     event_date: data.get("event_date"),
     event_time: data.get("event_time"),
     reported_by: data.get("reported_by"),
-    department: data.get("department"),
+    department: valueWithOther(data, "department"),
     patient_involved: data.get("patient_involved"),
     patient_identifier: data.get("patient_identifier"),
     staff_involved: data.get("staff_involved"),
     staff_names: data.get("staff_names"),
-    nature: data.getAll("nature"),
-    source: data.getAll("source"),
+    nature: valuesWithOther(data, "nature"),
+    source: valuesWithOther(data, "source"),
     complainants: data.get("complainants"),
     drug_involved: data.get("drug_involved"),
     drug_details: data.get("drug_details"),
     drug_recalled: data.get("drug_recalled"),
-    issue: data.getAll("issue"),
-    failure: data.getAll("failure"),
+    issue: valuesWithOther(data, "issue"),
+    failure: valuesWithOther(data, "failure"),
     complaint: data.get("complaint"),
     investigation: data.get("investigation"),
     resolution: data.get("resolution"),
@@ -338,8 +363,8 @@ async function onApprove(event) {
   const update = {
     status: "approved",
     qre_category: data.get("qre_category"),
-    qre_items: data.getAll("qre_items"),
-    review_department: data.get("review_department"),
+    qre_items: valuesWithOther(data, "qre_items"),
+    review_department: valueWithOther(data, "review_department"),
     pharmacist_notes: data.get("pharmacist_notes"),
     documentation_complete: data.get("documentation_complete"),
     reviewed_by: state.user.id,
@@ -351,6 +376,7 @@ async function onApprove(event) {
   state.selectedRecordId = null;
   els.reviewForm.reset();
   renderQreItems("clinical");
+  syncAllOtherFields();
   render();
 }
 
@@ -474,7 +500,14 @@ function renderPending() {
     button.addEventListener("click", () => {
       state.selectedRecordId = button.dataset.id;
       const record = selectedRecord();
-      els.reviewForm.elements.review_department.value = record.department || DEPARTMENTS[0];
+      if (record.department?.startsWith("Other: ")) {
+        els.reviewForm.elements.review_department.value = "Other";
+        els.reviewForm.elements.review_department_other.value = record.department.replace("Other: ", "");
+        syncOtherField("review_department", true);
+      } else {
+        els.reviewForm.elements.review_department.value = record.department || DEPARTMENTS[0];
+        syncOtherField("review_department", false);
+      }
       renderSelectedRecord();
       renderPending();
     });
@@ -508,6 +541,26 @@ function selectedRecord() {
 function renderQreItems(categoryKey) {
   const category = QRE_CATEGORIES[categoryKey];
   els.qreItems.innerHTML = category.items.map((item) => checkboxMarkup("qre_items", item)).join("");
+  syncOtherField("qre_items", false);
+}
+
+function valuesWithOther(data, name) {
+  const values = data.getAll(name).map((value) => value.toString());
+  const otherValue = data.get(`${name}_other`)?.toString().trim();
+  if (!values.includes("Other") || !otherValue) return values;
+  return values.map((value) => (value === "Other" ? `Other: ${otherValue}` : value));
+}
+
+function valueWithOther(data, name) {
+  const value = data.get(name)?.toString() || "";
+  const otherValue = data.get(`${name}_other`)?.toString().trim();
+  return value === "Other" && otherValue ? `Other: ${otherValue}` : value;
+}
+
+function syncAllOtherFields() {
+  ["department", "nature", "source", "issue", "failure", "qre_items", "review_department"].forEach((name) => {
+    syncOtherField(name, false);
+  });
 }
 
 function renderMetrics() {
@@ -520,7 +573,7 @@ function renderMetrics() {
   const rows = [];
   Object.entries(QRE_CATEGORIES).forEach(([key, category]) => {
     category.items.forEach((item) => {
-      const matching = approved.filter((record) => record.qre_category === key && (record.qre_items || []).includes(item));
+      const matching = approved.filter((record) => record.qre_category === key && includesMetricItem(record.qre_items || [], item));
       rows.push({
         category: category.label,
         item,
@@ -548,6 +601,10 @@ function renderMetrics() {
       <td>${escapeHtml(row.trend)}</td>
     </tr>`)
     .join("");
+}
+
+function includesMetricItem(values, item) {
+  return values.some((value) => value === item || (item === "Other" && value.startsWith("Other: ")));
 }
 
 function documentationRate(records) {
