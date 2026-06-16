@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -168,9 +168,11 @@ function bindEvents() {
   document.querySelector("#printButton").addEventListener("click", onPrintCurrentView);
   document.querySelector("#signOutButton").addEventListener("click", signOut);
   document.querySelector("#resetFormButton").addEventListener("click", () => {
-    els.varianceForm.reset();
-    setDefaultDates();
+    resetVarianceForm();
+    setVarianceSubmitState("idle");
   });
+  els.varianceForm.addEventListener("input", () => setVarianceSubmitState("idle"));
+  els.varianceForm.addEventListener("change", () => setVarianceSubmitState("idle"));
 
   els.loginForm.addEventListener("submit", onLogin);
   els.varianceForm.addEventListener("submit", onSubmitVariance);
@@ -329,7 +331,7 @@ async function onSubmitVariance(event) {
   if (state.isSubmittingVariance) return;
 
   state.isSubmittingVariance = true;
-  setVarianceSubmitState(true);
+  setVarianceSubmitState("submitting");
   showStatus("Submitting variance...", "info", { persist: true });
 
   const payload = formToVariance(event.currentTarget);
@@ -341,25 +343,38 @@ async function onSubmitVariance(event) {
         showStatus(error.message, "error");
         return;
       }
-      const slackResult = await notifySlack({ type: "submitted", record: payload });
       await loadRecords();
-      payload.slackResult = slackResult;
     } else {
       const next = [{ ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...state.records];
       state.records = next;
       storage.records = next;
     }
 
-    event.currentTarget.reset();
-    setDefaultDates();
-    syncAllOtherFields();
+    resetVarianceForm();
     render();
-    const slackMessage = payload.slackResult?.ok ? " Slack notification sent." : ` Slack notification not sent: ${payload.slackResult?.reason || "function not available"}.`;
-    showStatus(`Variance submitted successfully. It is now in Pharmacist Review.${slackMessage}`, payload.slackResult?.ok ? "success" : "warning", { persist: true });
-  } finally {
     state.isSubmittingVariance = false;
-    setVarianceSubmitState(false);
+    setVarianceSubmitState("submitted");
+    showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
+
+    notifySlack({ type: "submitted", record: payload }).then((slackResult) => {
+      if (slackResult.ok) {
+        showStatus("Variance submitted successfully. Slack notification sent.", "success", { persist: true });
+      } else {
+        showStatus(`Variance submitted successfully, but Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
+      }
+    });
+  } finally {
+    if (state.isSubmittingVariance) {
+      state.isSubmittingVariance = false;
+      setVarianceSubmitState("idle");
+    }
   }
+}
+
+function resetVarianceForm() {
+  els.varianceForm.reset();
+  setDefaultDates();
+  syncAllOtherFields();
 }
 
 function formToVariance(form) {
@@ -575,9 +590,26 @@ function onPrintCurrentView() {
   window.print();
 }
 
-function setVarianceSubmitState(isSubmitting) {
-  els.submitVarianceButton.disabled = isSubmitting;
-  els.submitVarianceButton.textContent = isSubmitting ? "Submitting..." : "Submit variance";
+function setVarianceSubmitState(status) {
+  window.clearTimeout(setVarianceSubmitState.timeoutId);
+  els.submitVarianceButton.classList.remove("submitted-button");
+
+  if (status === "submitting") {
+    els.submitVarianceButton.disabled = true;
+    els.submitVarianceButton.textContent = "Submitting...";
+    return;
+  }
+
+  if (status === "submitted") {
+    els.submitVarianceButton.disabled = true;
+    els.submitVarianceButton.textContent = "Submitted";
+    els.submitVarianceButton.classList.add("submitted-button");
+    setVarianceSubmitState.timeoutId = window.setTimeout(() => setVarianceSubmitState("idle"), 2500);
+    return;
+  }
+
+  els.submitVarianceButton.disabled = false;
+  els.submitVarianceButton.textContent = "Submit variance";
 }
 
 function showStatus(message, tone = "success", options = {}) {

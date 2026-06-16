@@ -218,6 +218,14 @@ textarea {
   background: var(--accent-dark);
 }
 
+.primary-button.submitted-button,
+.primary-button.submitted-button:hover,
+.primary-button.submitted-button:disabled {
+  background: var(--success);
+  color: #fff;
+  opacity: 1;
+}
+
 .primary-button:disabled,
 .ghost-button:disabled,
 .danger-button:disabled {
