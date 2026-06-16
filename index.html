@@ -274,17 +274,10 @@
             <div class="admin-grid">
               <div>
                 <h3>Supabase Connection</h3>
-                <form id="settingsForm" class="settings-form">
-                  <label>
-                    Supabase URL
-                    <input name="supabaseUrl" type="url" placeholder="https://project.supabase.co" />
-                  </label>
-                  <label>
-                    Supabase anon key
-                    <input name="supabaseAnonKey" type="password" />
-                  </label>
-                  <button class="primary-button" type="submit">Save settings</button>
-                </form>
+                <div class="role-table">
+                  <div><strong>Connected in code</strong><span>The GitHub Pages app uses the Supabase URL and anon public key saved at the top of app.js.</span></div>
+                  <div><strong>Private secrets</strong><span>Slack webhooks and service role keys should stay in Supabase secrets only.</span></div>
+                </div>
               </div>
               <div>
                 <h3>Roles</h3>

@@ -1,7 +1,7 @@
-const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
 const OPTIONS = {
   nature: ["Death", "Injury/Infection", "Adverse drug reaction", "Error", "Complaint", "Facility/equipment", "Material", "Other"],
@@ -85,12 +85,6 @@ const state = {
 };
 
 const storage = {
-  get settings() {
-    return JSON.parse(localStorage.getItem("qre_settings") || "{}");
-  },
-  set settings(value) {
-    localStorage.setItem("qre_settings", JSON.stringify(value));
-  },
   get records() {
     return JSON.parse(localStorage.getItem("qre_records") || "[]");
   },
@@ -105,7 +99,6 @@ const els = {
   loginForm: document.querySelector("#loginForm"),
   varianceForm: document.querySelector("#varianceForm"),
   reviewForm: document.querySelector("#reviewForm"),
-  settingsForm: document.querySelector("#settingsForm"),
   sessionCard: document.querySelector("#sessionCard"),
   authNote: document.querySelector("#authNote"),
   viewTitle: document.querySelector("#viewTitle"),
@@ -167,7 +160,6 @@ function bindEvents() {
   els.varianceForm.addEventListener("submit", onSubmitVariance);
   els.reviewForm.addEventListener("submit", onApprove);
   document.querySelector("#rejectButton").addEventListener("click", onReject);
-  els.settingsForm.addEventListener("submit", onSaveSettings);
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
   els.metricMonth.addEventListener("change", renderMetrics);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
@@ -184,10 +176,14 @@ async function connectSupabase() {
   const supabaseUrl = SUPABASE_URL;
   const supabaseAnonKey = SUPABASE_ANON_KEY;
 
-  els.settingsForm.elements.supabaseUrl.value = supabaseUrl || "";
-  els.settingsForm.elements.supabaseAnonKey.value = supabaseAnonKey || "";
-
-  if (!supabaseUrl || !supabaseAnonKey) return;
+  if (
+    !supabaseUrl ||
+    !supabaseAnonKey ||
+    supabaseUrl.includes("YOUR-PROJECT-REF") ||
+    supabaseAnonKey.includes("YOUR-ANON-PUBLIC-KEY")
+  ) {
+    return;
+  }
 
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
@@ -390,18 +386,6 @@ function requirePharmacist() {
   if (role === "pharmacist" || role === "admin") return true;
   alert("A pharmacist or admin login is required for approval.");
   return false;
-}
-
-async function onSaveSettings(event) {
-  event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  storage.settings = {
-    supabaseUrl: data.get("supabaseUrl").toString().trim(),
-    supabaseAnonKey: data.get("supabaseAnonKey").toString().trim()
-  };
-  await connectSupabase();
-  alert("Settings saved. Sign in with Supabase credentials after creating users.");
-  render();
 }
 
 async function signOut() {

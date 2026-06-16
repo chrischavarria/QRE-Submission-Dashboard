@@ -16,8 +16,9 @@ Open `index.html` in a browser. Until Supabase settings are saved, the app runs 
 2. Run `supabase/schema.sql` in the SQL editor.
 3. Create users in Supabase Auth.
 4. Set each user's profile role to `staff`, `pharmacist`, or `admin`.
-5. Deploy `supabase/functions/slack-notify`.
-6. Add Slack webhook secrets for the departments you use:
+5. Add your Supabase project URL and anon public key to the top of `app.js`.
+6. Deploy `supabase/functions/slack-notify`.
+7. Add Slack webhook secrets for the departments you use:
 
 ```bash
 supabase secrets set SLACK_WEBHOOK_FRONT="https://hooks.slack.com/services/..."
@@ -37,4 +38,4 @@ supabase secrets set SLACK_WEBHOOK_OTHER="https://hooks.slack.com/services/..."
 
 ## Deployment
 
-This app has no build step. Host the folder with any static host, then enter the Supabase URL and anon key in the Admin view.
+This app has no build step. Host the folder with any static host after adding the Supabase URL and anon public key to `app.js`.
