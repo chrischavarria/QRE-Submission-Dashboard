@@ -478,6 +478,89 @@ textarea {
   color: var(--ink);
 }
 
+.print-report {
+  display: none;
+}
+
+.print-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 2px solid #111;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.print-title p,
+.print-title h1 {
+  margin: 0;
+}
+
+.print-title p {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.print-title h1 {
+  font-size: 24px;
+}
+
+.print-title span {
+  border: 1px solid #111;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.print-section {
+  break-inside: avoid;
+  margin-bottom: 14px;
+}
+
+.print-section h2 {
+  margin: 0 0 8px;
+  border-bottom: 1px solid #999;
+  padding-bottom: 4px;
+  font-size: 15px;
+}
+
+.print-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+
+.print-item,
+.print-block {
+  border: 1px solid #bbb;
+  padding: 7px;
+}
+
+.print-item span,
+.print-block span {
+  display: block;
+  color: #555;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.print-item strong,
+.print-block p {
+  margin: 3px 0 0;
+  color: #111;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.print-block {
+  margin-bottom: 7px;
+}
+
 .metrics-toolbar {
   justify-content: space-between;
   margin-bottom: 16px;
@@ -592,25 +675,43 @@ th {
 }
 
 @media print {
-  .sidebar,
-  .topbar-actions,
-  .metrics-toolbar,
-  .nav-list,
-  .auth-panel {
+  body.printing-record .app-shell,
+  body.printing-record .status-banner {
     display: none !important;
   }
 
-  .app-shell {
+  body.printing-record .print-report {
     display: block;
-  }
-
-  .content,
-  .view-panel {
     padding: 0;
   }
 
-  .view-panel {
+  body.printing-record {
+    background: #fff;
+  }
+
+  body:not(.printing-record) .sidebar,
+  body:not(.printing-record) .topbar-actions,
+  body:not(.printing-record) .metrics-toolbar,
+  body:not(.printing-record) .nav-list,
+  body:not(.printing-record) .auth-panel {
+    display: none !important;
+  }
+
+  body:not(.printing-record) .app-shell {
+    display: block;
+  }
+
+  body:not(.printing-record) .content,
+  body:not(.printing-record) .view-panel {
+    padding: 0;
+  }
+
+  body:not(.printing-record) .view-panel {
     border: 0;
     box-shadow: none;
+  }
+
+  .print-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

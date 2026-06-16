@@ -21,6 +21,7 @@
           <button class="nav-item active" data-view="intake" type="button">Submit Variance</button>
           <button class="nav-item" data-view="review" type="button">Pharmacist Review</button>
           <button class="nav-item" data-view="metrics" type="button">Metrics</button>
+          <button class="nav-item" data-view="archive" type="button">Approved Archive</button>
           <button class="nav-item" data-view="admin" type="button">Admin</button>
         </nav>
 
@@ -215,7 +216,7 @@
 
               <div class="form-actions wide">
                 <button class="ghost-button" id="resetFormButton" type="button">Reset</button>
-                <button class="primary-button" type="submit">Submit variance</button>
+                <button class="primary-button" id="submitVarianceButton" type="submit">Submit variance</button>
               </div>
             </form>
           </section>
@@ -268,6 +269,7 @@
                   </div>
                 </fieldset>
                 <div class="form-actions">
+                  <button class="ghost-button" id="printReviewButton" type="button">Print selected</button>
                   <button class="ghost-button" id="rejectButton" type="button">Return for follow-up</button>
                   <button class="primary-button" type="submit">Approve and track</button>
                 </div>
@@ -300,6 +302,29 @@
             </div>
           </section>
 
+          <section class="view-panel hidden" data-panel="archive">
+            <div class="split-layout">
+              <div class="queue-panel">
+                <div class="section-heading">
+                  <h3>Approved Variances</h3>
+                  <span class="status-pill" id="approvedCount">0 approved</span>
+                </div>
+                <div id="approvedList" class="record-list"></div>
+              </div>
+
+              <div class="review-panel">
+                <div class="section-heading">
+                  <h3>Approved Preview</h3>
+                  <span class="status-pill" id="approvedStatus">No record selected</span>
+                </div>
+                <div id="approvedPreview" class="summary-box">Select an approved variance to review or print.</div>
+                <div class="form-actions">
+                  <button class="ghost-button" id="printApprovedButton" type="button">Print selected variance</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="view-panel hidden" data-panel="admin">
             <div class="admin-grid">
               <div>
@@ -322,6 +347,8 @@
         </section>
       </main>
     </div>
+
+    <section class="print-report" id="printReport" aria-hidden="true"></section>
 
     <script type="module" src="./app.js"></script>
   </body>

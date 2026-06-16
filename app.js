@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -81,6 +81,7 @@ const state = {
   profile: null,
   records: [],
   selectedRecordId: null,
+  selectedApprovedId: null,
   activeView: "intake",
   isSubmittingVariance: false
 };
@@ -109,6 +110,13 @@ const els = {
   pendingCount: document.querySelector("#pendingCount"),
   selectedStatus: document.querySelector("#selectedStatus"),
   reviewSummary: document.querySelector("#reviewSummary"),
+  approvedList: document.querySelector("#approvedList"),
+  approvedCount: document.querySelector("#approvedCount"),
+  approvedStatus: document.querySelector("#approvedStatus"),
+  approvedPreview: document.querySelector("#approvedPreview"),
+  printApprovedButton: document.querySelector("#printApprovedButton"),
+  printReviewButton: document.querySelector("#printReviewButton"),
+  printReport: document.querySelector("#printReport"),
   qreItems: document.querySelector("#qreItems"),
   metricMonth: document.querySelector("#metricMonth"),
   metricCards: document.querySelector("#metricCards"),
@@ -152,7 +160,7 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
 
-  document.querySelector("#printButton").addEventListener("click", () => window.print());
+  document.querySelector("#printButton").addEventListener("click", onPrintCurrentView);
   document.querySelector("#signOutButton").addEventListener("click", signOut);
   document.querySelector("#resetFormButton").addEventListener("click", () => {
     els.varianceForm.reset();
@@ -163,10 +171,23 @@ function bindEvents() {
   els.varianceForm.addEventListener("submit", onSubmitVariance);
   els.reviewForm.addEventListener("submit", onApprove);
   document.querySelector("#rejectButton").addEventListener("click", onReject);
+  els.printReviewButton.addEventListener("click", () => {
+    const record = selectedRecord();
+    if (!record) {
+      showStatus("Select a pending submission before printing.", "error");
+      return;
+    }
+    printRecord({ ...record, ...reviewFormToPrintable() }, "review");
+  });
+  els.printApprovedButton.addEventListener("click", () => printRecord(selectedApprovedRecord(), "approved"));
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
   document.addEventListener("change", onOtherControlChange);
   els.metricMonth.addEventListener("change", renderMetrics);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
+  window.addEventListener("afterprint", () => {
+    document.body.classList.remove("printing-record");
+    els.printReport.innerHTML = "";
+  });
 }
 
 function setDefaultDates() {
@@ -386,6 +407,7 @@ async function onApprove(event) {
 
   await persistUpdate(record.id, update);
   await notifySlack({ type: "approved", record: { ...record, ...update } });
+  state.selectedApprovedId = record.id;
   state.selectedRecordId = null;
   els.reviewForm.reset();
   renderQreItems("clinical");
@@ -500,7 +522,39 @@ function render() {
   els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(roleLabel + titleLabel)}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
 
   renderPending();
+  renderApprovedArchive();
   renderMetrics();
+}
+
+function onPrintCurrentView() {
+  if (!state.user) return;
+
+  if (state.activeView === "intake") {
+    printRecord(formToVariance(els.varianceForm), "draft");
+    return;
+  }
+
+  if (state.activeView === "review") {
+    const record = selectedRecord();
+    if (!record) {
+      showStatus("Select a pending submission before printing.", "error");
+      return;
+    }
+    printRecord({ ...record, ...reviewFormToPrintable() }, "review");
+    return;
+  }
+
+  if (state.activeView === "archive") {
+    const record = selectedApprovedRecord();
+    if (!record) {
+      showStatus("Select an approved variance before printing.", "error");
+      return;
+    }
+    printRecord(record, "approved");
+    return;
+  }
+
+  window.print();
 }
 
 function setVarianceSubmitState(isSubmitting) {
@@ -577,15 +631,57 @@ function renderPending() {
   renderSelectedRecord();
 }
 
+function renderApprovedArchive() {
+  const approved = state.records.filter((record) => record.status === "approved");
+  els.approvedCount.textContent = `${approved.length} approved`;
+
+  if (!approved.length) {
+    els.approvedList.innerHTML = `<div class="summary-box">No approved variances yet.</div>`;
+  } else {
+    els.approvedList.innerHTML = approved
+      .map((record) => {
+        const active = record.id === state.selectedApprovedId ? " active" : "";
+        const category = QRE_CATEGORIES[record.qre_category]?.label || "Approved variance";
+        const deleteButton = state.profile?.role === "admin"
+          ? `<button class="danger-button delete-approved-record" data-id="${record.id}" type="button">Delete</button>`
+          : "";
+        return `<div class="record-card${active}">
+          <button class="record-select approved-select" data-id="${record.id}" type="button">
+            <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
+            <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.review_department || record.department || "")}</span>
+            <span>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
+          </button>
+          ${deleteButton}
+        </div>`;
+      })
+      .join("");
+  }
+
+  els.approvedList.querySelectorAll(".approved-select").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedApprovedId = button.dataset.id;
+      renderApprovedArchive();
+    });
+  });
+
+  els.approvedList.querySelectorAll(".delete-approved-record").forEach((button) => {
+    button.addEventListener("click", () => deleteSubmission(button.dataset.id));
+  });
+
+  renderSelectedApproved();
+}
+
 function renderSelectedRecord() {
   const record = selectedRecord();
   if (!record) {
     els.selectedStatus.textContent = "No record selected";
     els.reviewSummary.innerHTML = "Select a pending report to review.";
+    els.printReviewButton.disabled = true;
     return;
   }
 
   els.selectedStatus.textContent = "Ready for pharmacist review";
+  els.printReviewButton.disabled = false;
   els.reviewSummary.innerHTML = `
     <div class="preview-header">
       <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
@@ -616,6 +712,20 @@ function renderSelectedRecord() {
   `;
 }
 
+function renderSelectedApproved() {
+  const record = selectedApprovedRecord();
+  if (!record) {
+    els.approvedStatus.textContent = "No record selected";
+    els.approvedPreview.innerHTML = "Select an approved variance to review or print.";
+    els.printApprovedButton.disabled = true;
+    return;
+  }
+
+  els.approvedStatus.textContent = "Approved variance";
+  els.approvedPreview.innerHTML = printableRecordBody(record, { includeTitle: false });
+  els.printApprovedButton.disabled = false;
+}
+
 function previewItem(label, value) {
   return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "N/A")}</strong></div>`;
 }
@@ -624,8 +734,122 @@ function listValue(value) {
   return Array.isArray(value) && value.length ? value.join(", ") : "";
 }
 
+function reviewFormToPrintable() {
+  const data = new FormData(els.reviewForm);
+  return {
+    qre_category: data.get("qre_category"),
+    qre_items: valuesWithOther(data, "qre_items"),
+    review_department: valueWithOther(data, "review_department"),
+    pharmacist_notes: data.get("pharmacist_notes"),
+    documentation_complete: data.get("documentation_complete")
+  };
+}
+
+function printRecord(record, mode = "approved") {
+  if (!record) return;
+  els.printReport.innerHTML = printableRecordBody(record, { includeTitle: true, mode });
+  document.body.classList.add("printing-record");
+  window.print();
+}
+
+function printableRecordBody(record, options = {}) {
+  const category = QRE_CATEGORIES[record.qre_category]?.label || record.qre_category || "Not selected";
+  const statusLabel = formatStatus(record.status || (options.mode === "draft" ? "draft" : ""));
+  const title = options.includeTitle
+    ? `<div class="print-title">
+        <div>
+          <p>Quality Related Event</p>
+          <h1>Variance Report</h1>
+        </div>
+        <span>${escapeHtml(statusLabel)}</span>
+      </div>`
+    : "";
+
+  return `
+    ${title}
+    <div class="print-section">
+      <h2>Event Details</h2>
+      <div class="print-grid">
+        ${printItem("Date", record.event_date)}
+        ${printItem("Time", record.event_time)}
+        ${printItem("Reported by", record.reported_by)}
+        ${printItem("Department", record.department)}
+        ${printItem("Patient involved", record.patient_involved)}
+        ${printItem("Patient ID / RX / Lot #", record.patient_identifier)}
+        ${printItem("Staff involved", record.staff_involved)}
+        ${printItem("Staff name(s)", record.staff_names)}
+      </div>
+    </div>
+    <div class="print-section">
+      <h2>Variance Classification</h2>
+      <div class="print-grid">
+        ${printItem("Nature of variance", listValue(record.nature))}
+        ${printItem("Source of complaint", listValue(record.source))}
+        ${printItem("Complainant(s)", record.complainants)}
+        ${printItem("Drug involved", record.drug_involved)}
+        ${printItem("Name / strength of drug(s)", record.drug_details)}
+        ${printItem("Drug recalled", record.drug_recalled)}
+        ${printItem("Incorrect / issue with", listValue(record.issue))}
+        ${printItem("Failure to identify/manage", listValue(record.failure))}
+      </div>
+    </div>
+    <div class="print-section">
+      <h2>Issue, Investigation, and Resolution</h2>
+      ${printBlock("Issue / complaint", record.complaint)}
+      ${printBlock("Investigation / root cause", record.investigation)}
+      ${printBlock("Resolution / corrective action", record.resolution)}
+      ${printBlock("Follow-up / recurrence prevention", record.follow_up)}
+      <div class="print-grid">
+        ${printItem("Client/patient notified", record.patient_notified)}
+        ${printItem("Prescriber notified", record.prescriber_notified)}
+        ${printItem("Report filled out by", record.completed_by)}
+      </div>
+    </div>
+    <div class="print-section">
+      <h2>Pharmacist Review</h2>
+      <div class="print-grid">
+        ${printItem("QRE category", category)}
+        ${printItem("QRE metric item(s)", listValue(record.qre_items))}
+        ${printItem("Notification department", record.review_department)}
+        ${printItem("Documentation complete", record.documentation_complete)}
+        ${printItem("Reviewed at", formatDateTime(record.reviewed_at))}
+      </div>
+      ${printBlock("Pharmacist notes", record.pharmacist_notes)}
+    </div>
+  `;
+}
+
+function printItem(label, value) {
+  return `<div class="print-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "N/A")}</strong></div>`;
+}
+
+function printBlock(label, value) {
+  return `<div class="print-block"><span>${escapeHtml(label)}</span><p>${escapeHtml(value || "N/A")}</p></div>`;
+}
+
+function formatStatus(status) {
+  const labels = {
+    draft: "Draft",
+    pending: "Pending Review",
+    approved: "Approved",
+    returned: "Returned"
+  };
+  return labels[status] || "Variance";
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
 function selectedRecord() {
   return state.records.find((record) => record.id === state.selectedRecordId);
+}
+
+function selectedApprovedRecord() {
+  return state.records.find((record) => record.id === state.selectedApprovedId);
 }
 
 function renderQreItems(categoryKey) {
