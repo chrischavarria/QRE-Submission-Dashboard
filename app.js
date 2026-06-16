@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -100,6 +100,7 @@ const els = {
   varianceForm: document.querySelector("#varianceForm"),
   reviewForm: document.querySelector("#reviewForm"),
   sessionCard: document.querySelector("#sessionCard"),
+  statusBanner: document.querySelector("#statusBanner"),
   authNote: document.querySelector("#authNote"),
   viewTitle: document.querySelector("#viewTitle"),
   pendingList: document.querySelector("#pendingList"),
@@ -278,7 +279,7 @@ async function onSubmitVariance(event) {
   if (state.supabase) {
     const { error } = await state.supabase.from("variance_reports").insert(payload);
     if (error) {
-      alert(error.message);
+      showStatus(error.message, "error");
       return;
     }
     await notifySlack({ type: "submitted", record: payload });
@@ -292,7 +293,7 @@ async function onSubmitVariance(event) {
   event.currentTarget.reset();
   setDefaultDates();
   render();
-  alert("Variance submitted.");
+  showStatus("Variance submitted successfully.", "success");
 }
 
 function formToVariance(form) {
@@ -366,7 +367,7 @@ async function persistUpdate(id, update) {
   if (state.supabase) {
     const { error } = await state.supabase.from("variance_reports").update(update).eq("id", id);
     if (error) {
-      alert(error.message);
+      showStatus(error.message, "error");
       return;
     }
     await loadRecords();
@@ -384,7 +385,7 @@ async function notifySlack(payload) {
 function requirePharmacist() {
   const role = state.profile?.role;
   if (role === "pharmacist" || role === "admin") return true;
-  alert("A pharmacist or admin login is required for approval.");
+  showStatus("A pharmacist or admin login is required for approval.", "error");
   return false;
 }
 
@@ -422,10 +423,21 @@ function render() {
   });
 
   els.viewTitle.textContent = document.querySelector(`.nav-item[data-view="${state.activeView}"]`).textContent;
-  els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(state.profile?.title || state.profile?.role || "Staff")}<br>${state.supabase ? "Supabase connected" : "Local demo mode"}`;
+  const connectionLabel = state.supabase ? "Supabase connected" : "Local demo mode";
+  const connectionClass = state.supabase ? "connected" : "demo";
+  els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(state.profile?.title || state.profile?.role || "Staff")}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
 
   renderPending();
   renderMetrics();
+}
+
+function showStatus(message, tone = "success") {
+  els.statusBanner.textContent = message;
+  els.statusBanner.className = `status-banner ${tone}`;
+  window.clearTimeout(showStatus.timeoutId);
+  showStatus.timeoutId = window.setTimeout(() => {
+    els.statusBanner.classList.add("hidden");
+  }, 5500);
 }
 
 function renderPending() {

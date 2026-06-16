@@ -113,6 +113,27 @@ textarea {
   line-height: 1.5;
 }
 
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.connection-pill.connected {
+  background: rgba(36, 145, 99, 0.18);
+  color: #9ef0c5;
+}
+
+.connection-pill.demo {
+  background: rgba(255, 255, 255, 0.12);
+  color: #dce6ef;
+}
+
 .content {
   min-width: 0;
   padding: 28px;
@@ -128,6 +149,25 @@ textarea {
 
 .topbar h2 {
   font-size: 28px;
+}
+
+.status-banner {
+  margin: -8px 0 18px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+.status-banner.success {
+  border: 1px solid rgba(25, 120, 84, 0.28);
+  background: #e8f6ef;
+  color: var(--success);
+}
+
+.status-banner.error {
+  border: 1px solid rgba(167, 52, 52, 0.28);
+  background: #faecec;
+  color: var(--danger);
 }
 
 .eyebrow {
