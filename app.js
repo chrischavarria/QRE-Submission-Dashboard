@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -355,14 +355,6 @@ async function onSubmitVariance(event) {
     state.isSubmittingVariance = false;
     setVarianceSubmitState("submitted");
     showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
-
-    notifySlack({ type: "submitted", record: payload }).then((slackResult) => {
-      if (slackResult.ok) {
-        showStatus("Variance submitted successfully. Slack notification sent.", "success", { persist: true });
-      } else {
-        showStatus(`Variance submitted successfully, but Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
-      }
-    });
   } finally {
     if (state.isSubmittingVariance) {
       state.isSubmittingVariance = false;
@@ -430,7 +422,9 @@ async function onApprove(event) {
   await persistUpdate(record.id, update);
   const slackResult = await notifySlack({ type: "approved", record: { ...record, ...update } });
   if (!slackResult.ok) {
-    showStatus(`Approved, but Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
+    showStatus(`Approved and tracked. Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
+  } else {
+    showStatus("Approved and tracked. Slack notification sent.", "success", { persist: true });
   }
   state.selectedApprovedId = record.id;
   state.selectedRecordId = null;
