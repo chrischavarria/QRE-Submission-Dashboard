@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -81,7 +81,8 @@ const state = {
   profile: null,
   records: [],
   selectedRecordId: null,
-  activeView: "intake"
+  activeView: "intake",
+  isSubmittingVariance: false
 };
 
 const storage = {
@@ -101,6 +102,7 @@ const els = {
   reviewForm: document.querySelector("#reviewForm"),
   sessionCard: document.querySelector("#sessionCard"),
   statusBanner: document.querySelector("#statusBanner"),
+  submitVarianceButton: document.querySelector("#submitVarianceButton"),
   authNote: document.querySelector("#authNote"),
   viewTitle: document.querySelector("#viewTitle"),
   pendingList: document.querySelector("#pendingList"),
@@ -298,27 +300,38 @@ async function loadRecords() {
 
 async function onSubmitVariance(event) {
   event.preventDefault();
+  if (state.isSubmittingVariance) return;
+
+  state.isSubmittingVariance = true;
+  setVarianceSubmitState(true);
+  showStatus("Submitting variance...", "info", { persist: true });
+
   const payload = formToVariance(event.currentTarget);
 
-  if (state.supabase) {
-    const { error } = await state.supabase.from("variance_reports").insert(payload);
-    if (error) {
-      showStatus(error.message, "error");
-      return;
+  try {
+    if (state.supabase) {
+      const { error } = await state.supabase.from("variance_reports").insert(payload);
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      await notifySlack({ type: "submitted", record: payload });
+      await loadRecords();
+    } else {
+      const next = [{ ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...state.records];
+      state.records = next;
+      storage.records = next;
     }
-    await notifySlack({ type: "submitted", record: payload });
-    await loadRecords();
-  } else {
-    const next = [{ ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...state.records];
-    state.records = next;
-    storage.records = next;
-  }
 
-  event.currentTarget.reset();
-  setDefaultDates();
-  syncAllOtherFields();
-  render();
-  showStatus("Variance submitted successfully.", "success");
+    event.currentTarget.reset();
+    setDefaultDates();
+    syncAllOtherFields();
+    render();
+    showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
+  } finally {
+    state.isSubmittingVariance = false;
+    setVarianceSubmitState(false);
+  }
 }
 
 function formToVariance(form) {
@@ -403,6 +416,31 @@ async function persistUpdate(id, update) {
   }
 }
 
+async function deleteSubmission(id) {
+  if (!requireAdmin()) return;
+  const record = state.records.find((candidate) => candidate.id === id);
+  if (!record) return;
+
+  const label = `${record.reported_by || "submission"} from ${record.event_date || "unknown date"}`;
+  if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+  if (state.supabase) {
+    const { error } = await state.supabase.from("variance_reports").delete().eq("id", id);
+    if (error) {
+      showStatus(error.message, "error");
+      return;
+    }
+    await loadRecords();
+  } else {
+    state.records = state.records.filter((candidate) => candidate.id !== id);
+    storage.records = state.records;
+  }
+
+  if (state.selectedRecordId === id) state.selectedRecordId = null;
+  render();
+  showStatus("Submission deleted.", "success");
+}
+
 async function notifySlack(payload) {
   if (!state.supabase) return;
   await state.supabase.functions.invoke("slack-notify", { body: payload });
@@ -412,6 +450,12 @@ function requirePharmacist() {
   const role = state.profile?.role;
   if (role === "pharmacist" || role === "admin") return true;
   showStatus("A pharmacist or admin login is required for approval.", "error");
+  return false;
+}
+
+function requireAdmin() {
+  if (state.profile?.role === "admin") return true;
+  showStatus("An admin login is required to delete submissions.", "error");
   return false;
 }
 
@@ -459,13 +503,20 @@ function render() {
   renderMetrics();
 }
 
-function showStatus(message, tone = "success") {
+function setVarianceSubmitState(isSubmitting) {
+  els.submitVarianceButton.disabled = isSubmitting;
+  els.submitVarianceButton.textContent = isSubmitting ? "Submitting..." : "Submit variance";
+}
+
+function showStatus(message, tone = "success", options = {}) {
   els.statusBanner.textContent = message;
   els.statusBanner.className = `status-banner ${tone}`;
   window.clearTimeout(showStatus.timeoutId);
-  showStatus.timeoutId = window.setTimeout(() => {
-    els.statusBanner.classList.add("hidden");
-  }, 5500);
+  if (!options.persist) {
+    showStatus.timeoutId = window.setTimeout(() => {
+      els.statusBanner.classList.add("hidden");
+    }, 5500);
+  }
 }
 
 function formatRole(role) {
@@ -487,16 +538,22 @@ function renderPending() {
     els.pendingList.innerHTML = pending
       .map((record) => {
         const active = record.id === state.selectedRecordId ? " active" : "";
-        return `<button class="record-card${active}" data-id="${record.id}" type="button">
-          <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
-          <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.department || "")}</span>
-          <span>${escapeHtml((record.nature || []).join(", ") || "Variance")}</span>
-        </button>`;
+        const deleteButton = state.profile?.role === "admin"
+          ? `<button class="danger-button delete-record" data-id="${record.id}" type="button">Delete</button>`
+          : "";
+        return `<div class="record-card${active}">
+          <button class="record-select" data-id="${record.id}" type="button">
+            <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
+            <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.department || "")}</span>
+            <span>${escapeHtml((record.nature || []).join(", ") || "Variance")}</span>
+          </button>
+          ${deleteButton}
+        </div>`;
       })
       .join("");
   }
 
-  els.pendingList.querySelectorAll(".record-card").forEach((button) => {
+  els.pendingList.querySelectorAll(".record-select").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedRecordId = button.dataset.id;
       const record = selectedRecord();
@@ -513,6 +570,10 @@ function renderPending() {
     });
   });
 
+  els.pendingList.querySelectorAll(".delete-record").forEach((button) => {
+    button.addEventListener("click", () => deleteSubmission(button.dataset.id));
+  });
+
   renderSelectedRecord();
 }
 
@@ -526,12 +587,41 @@ function renderSelectedRecord() {
 
   els.selectedStatus.textContent = "Ready for pharmacist review";
   els.reviewSummary.innerHTML = `
-    <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
-    <div>Date: ${escapeHtml(record.event_date || "")} ${escapeHtml(record.event_time || "")}</div>
-    <div>Issue with: ${escapeHtml((record.issue || []).join(", ") || "N/A")}</div>
-    <div>Investigation: ${escapeHtml(record.investigation || "Not entered")}</div>
-    <div>Resolution: ${escapeHtml(record.resolution || "Not entered")}</div>
+    <div class="preview-header">
+      <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
+      <span>${escapeHtml(record.event_date || "")} ${escapeHtml(record.event_time || "")}</span>
+    </div>
+    <div class="preview-grid">
+      ${previewItem("Reported by", record.reported_by)}
+      ${previewItem("Department", record.department)}
+      ${previewItem("Patient involved", record.patient_involved)}
+      ${previewItem("Patient ID / RX / Lot #", record.patient_identifier)}
+      ${previewItem("Staff involved", record.staff_involved)}
+      ${previewItem("Staff names", record.staff_names)}
+      ${previewItem("Nature", listValue(record.nature))}
+      ${previewItem("Source", listValue(record.source))}
+      ${previewItem("Complainants", record.complainants)}
+      ${previewItem("Drug involved", record.drug_involved)}
+      ${previewItem("Drug details", record.drug_details)}
+      ${previewItem("Drug recalled", record.drug_recalled)}
+      ${previewItem("Issue with", listValue(record.issue))}
+      ${previewItem("Failure to identify/manage", listValue(record.failure))}
+      ${previewItem("Patient notified", record.patient_notified)}
+      ${previewItem("Prescriber notified", record.prescriber_notified)}
+      ${previewItem("Report filled out by", record.completed_by)}
+    </div>
+    <div class="preview-section"><span>Investigation / root cause</span><p>${escapeHtml(record.investigation || "Not entered")}</p></div>
+    <div class="preview-section"><span>Resolution / corrective action</span><p>${escapeHtml(record.resolution || "Not entered")}</p></div>
+    <div class="preview-section"><span>Follow-up / recurrence prevention</span><p>${escapeHtml(record.follow_up || "Not entered")}</p></div>
   `;
+}
+
+function previewItem(label, value) {
+  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "N/A")}</strong></div>`;
+}
+
+function listValue(value) {
+  return Array.isArray(value) && value.length ? value.join(", ") : "";
 }
 
 function selectedRecord() {
