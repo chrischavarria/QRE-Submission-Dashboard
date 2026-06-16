@@ -1,5 +1,7 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+const SLACK_APPS_SCRIPT_URL = "YOUR-GOOGLE-APPS-SCRIPT-WEB-APP-URL";
+const SLACK_APPS_SCRIPT_TOKEN = "qre-dashboard";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -483,16 +485,21 @@ async function deleteSubmission(id) {
 }
 
 async function notifySlack(payload) {
-  if (!state.supabase) return { ok: false, reason: "Supabase is not connected" };
-
-  try {
-    const { data, error } = await state.supabase.functions.invoke("slack-notify", { body: payload });
-    if (error) return { ok: false, reason: error.message || "Edge Function error" };
-    if (!data?.ok) return { ok: false, reason: data?.reason || "Slack rejected the notification" };
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, reason: error.message || "Unable to call Slack function" };
+  if (!SLACK_APPS_SCRIPT_URL || SLACK_APPS_SCRIPT_URL.includes("YOUR-GOOGLE-APPS-SCRIPT")) {
+    return { ok: false, reason: "Google Apps Script URL is not configured" };
   }
+
+  const response = await fetch(SLACK_APPS_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "content-type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      token: SLACK_APPS_SCRIPT_TOKEN,
+      ...payload
+    })
+  });
+
+  return { ok: response.type === "opaque" || response.ok, reason: response.ok ? "" : "Google Apps Script did not accept the request" };
 }
 
 function requirePharmacist() {

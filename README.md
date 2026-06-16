@@ -1,6 +1,6 @@
 # QRE Variance Dashboard
 
-Static Supabase-ready dashboard for pharmacy variance reporting, pharmacist approval, QRE metric tracking, CSV export, printing, and Slack department notifications.
+Static Supabase-ready dashboard for pharmacy variance reporting, pharmacist approval, QRE metric tracking, CSV export, printing, and Slack notifications through Google Apps Script.
 
 ## Local use
 
@@ -17,17 +17,24 @@ Open `index.html` in a browser. Until Supabase settings are saved, the app runs 
 3. Create users in Supabase Auth.
 4. Set each user's profile role to `staff`, `pharmacist`, or `admin`.
 5. Add your Supabase project URL and anon public key to the top of `app.js`.
-6. Deploy `supabase/functions/slack-notify`.
-7. Add Slack webhook secrets for the departments you use:
+6. Create the Google Apps Script Slack proxy from `apps-script/slack-notify.gs`.
+7. Add the deployed Apps Script web app URL to `SLACK_APPS_SCRIPT_URL` at the top of `app.js`.
 
-```bash
-supabase secrets set SLACK_WEBHOOK_FRONT="https://hooks.slack.com/services/..."
-supabase secrets set SLACK_WEBHOOK_LAB="https://hooks.slack.com/services/..."
-supabase secrets set SLACK_WEBHOOK_CONTRACT_FULFILLMENT="https://hooks.slack.com/services/..."
-supabase secrets set SLACK_WEBHOOK_FRONT_FULFILLMENT="https://hooks.slack.com/services/..."
-supabase secrets set SLACK_WEBHOOK_RPH="https://hooks.slack.com/services/..."
-supabase secrets set SLACK_WEBHOOK_OTHER="https://hooks.slack.com/services/..."
-```
+## Slack setup with Google Apps Script
+
+1. Go to <https://script.google.com/> and create a new project.
+2. Paste the contents of `apps-script/slack-notify.gs` into the script editor.
+3. Open **Project Settings** and add a script property:
+   - Property: `SLACK_WEBHOOK_URL`
+   - Value: your Slack incoming webhook URL
+4. Click **Deploy** → **New deployment**.
+5. Choose **Web app**.
+6. Set **Execute as** to `Me`.
+7. Set **Who has access** to `Anyone`.
+8. Deploy and copy the web app URL.
+9. Paste that URL into `SLACK_APPS_SCRIPT_URL` at the top of `app.js`.
+
+Slack notifications are sent only after the pharmacist clicks **Approve and track**.
 
 ## App flow
 
