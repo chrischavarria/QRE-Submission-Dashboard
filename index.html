@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QRE Variance Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">Q</span>
+          <div>
+            <h1>QRE Dashboard</h1>
+            <p>Variance reporting</p>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Dashboard views">
+          <button class="nav-item active" data-view="intake" type="button">Submit Variance</button>
+          <button class="nav-item" data-view="review" type="button">Pharmacist Review</button>
+          <button class="nav-item" data-view="metrics" type="button">Metrics</button>
+          <button class="nav-item" data-view="admin" type="button">Admin</button>
+        </nav>
+
+        <div class="session-card" id="sessionCard"></div>
+      </aside>
+
+      <main class="content">
+        <section class="topbar">
+          <div>
+            <p class="eyebrow">Quality related events</p>
+            <h2 id="viewTitle">Submit Variance</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="printButton" type="button">Print</button>
+            <button class="primary-button" id="signOutButton" type="button">Sign out</button>
+          </div>
+        </section>
+
+        <section id="authView" class="auth-panel hidden">
+          <form id="loginForm" class="auth-form">
+            <div>
+              <p class="eyebrow">Secure access</p>
+              <h2>Sign in</h2>
+            </div>
+            <label>
+              Email
+              <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="primary-button" type="submit">Sign in</button>
+            <p class="form-note" id="authNote"></p>
+          </form>
+        </section>
+
+        <section id="dashboardView" class="dashboard">
+          <section class="view-panel" data-panel="intake">
+            <form id="varianceForm" class="form-grid">
+              <div class="section-heading">
+                <h3>Variance Report</h3>
+                <span class="status-pill">Draft</span>
+              </div>
+
+              <label>
+                Date
+                <input name="event_date" type="date" required />
+              </label>
+              <label>
+                Time
+                <input name="event_time" type="time" required />
+              </label>
+              <label>
+                Reported by
+                <input name="reported_by" type="text" required />
+              </label>
+              <label>
+                Department
+                <select name="department" required></select>
+              </label>
+
+              <fieldset>
+                <legend>Patient involved?</legend>
+                <div class="segmented">
+                  <label><input name="patient_involved" type="radio" value="yes" required /> Yes</label>
+                  <label><input name="patient_involved" type="radio" value="no" /> No</label>
+                </div>
+              </fieldset>
+              <label>
+                Patient ID / RX / Lot #
+                <input name="patient_identifier" type="text" />
+              </label>
+              <fieldset>
+                <legend>Staff involved?</legend>
+                <div class="segmented">
+                  <label><input name="staff_involved" type="radio" value="yes" required /> Yes</label>
+                  <label><input name="staff_involved" type="radio" value="no" /> No</label>
+                </div>
+              </fieldset>
+              <label>
+                Staff name(s)
+                <input name="staff_names" type="text" />
+              </label>
+
+              <fieldset class="wide">
+                <legend>Nature of variance</legend>
+                <div class="check-grid" data-checkboxes="nature"></div>
+              </fieldset>
+
+              <fieldset class="wide">
+                <legend>Source of complaint</legend>
+                <div class="check-grid" data-checkboxes="source"></div>
+              </fieldset>
+
+              <label class="wide">
+                Complainant(s)
+                <input name="complainants" type="text" />
+              </label>
+
+              <fieldset>
+                <legend>Drug involved?</legend>
+                <div class="segmented">
+                  <label><input name="drug_involved" type="radio" value="yes" required /> Yes</label>
+                  <label><input name="drug_involved" type="radio" value="no" /> No</label>
+                  <label><input name="drug_involved" type="radio" value="na" /> N/A</label>
+                </div>
+              </fieldset>
+              <label>
+                Name / strength of drug(s)
+                <input name="drug_details" type="text" />
+              </label>
+              <fieldset>
+                <legend>Drug recalled?</legend>
+                <div class="segmented">
+                  <label><input name="drug_recalled" type="radio" value="yes" required /> Yes</label>
+                  <label><input name="drug_recalled" type="radio" value="no" /> No</label>
+                  <label><input name="drug_recalled" type="radio" value="na" /> N/A</label>
+                </div>
+              </fieldset>
+
+              <fieldset class="wide">
+                <legend>Incorrect / issue with</legend>
+                <div class="check-grid" data-checkboxes="issue"></div>
+              </fieldset>
+
+              <fieldset class="wide">
+                <legend>Failure to identify and manage</legend>
+                <div class="check-grid" data-checkboxes="failure"></div>
+              </fieldset>
+
+              <label class="wide">
+                Issue / complaint
+                <textarea name="complaint" rows="4" required></textarea>
+              </label>
+              <label class="wide">
+                Investigation / root cause
+                <textarea name="investigation" rows="4"></textarea>
+              </label>
+              <label class="wide">
+                Resolution / corrective action
+                <textarea name="resolution" rows="4"></textarea>
+              </label>
+              <label class="wide">
+                Follow-up / recurrence prevention
+                <textarea name="follow_up" rows="4"></textarea>
+              </label>
+
+              <fieldset>
+                <legend>Client/patient notified?</legend>
+                <div class="segmented">
+                  <label><input name="patient_notified" type="radio" value="yes" /> Yes</label>
+                  <label><input name="patient_notified" type="radio" value="no" /> No</label>
+                  <label><input name="patient_notified" type="radio" value="na" /> N/A</label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>Prescriber notified?</legend>
+                <div class="segmented">
+                  <label><input name="prescriber_notified" type="radio" value="yes" /> Yes</label>
+                  <label><input name="prescriber_notified" type="radio" value="no" /> No</label>
+                  <label><input name="prescriber_notified" type="radio" value="na" /> N/A</label>
+                </div>
+              </fieldset>
+
+              <label>
+                Report filled out by
+                <input name="completed_by" type="text" />
+              </label>
+
+              <div class="form-actions wide">
+                <button class="ghost-button" id="resetFormButton" type="button">Reset</button>
+                <button class="primary-button" type="submit">Submit variance</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="view-panel hidden" data-panel="review">
+            <div class="split-layout">
+              <div class="queue-panel">
+                <div class="section-heading">
+                  <h3>Pending Submissions</h3>
+                  <span class="status-pill" id="pendingCount">0 pending</span>
+                </div>
+                <div id="pendingList" class="record-list"></div>
+              </div>
+
+              <form id="reviewForm" class="review-panel">
+                <div class="section-heading">
+                  <h3>Pharmacist Approval</h3>
+                  <span class="status-pill" id="selectedStatus">No record selected</span>
+                </div>
+                <div id="reviewSummary" class="summary-box"></div>
+                <label>
+                  QRE category
+                  <select name="qre_category" required></select>
+                </label>
+                <fieldset class="wide">
+                  <legend>QRE metric items</legend>
+                  <div class="check-grid" id="qreItems"></div>
+                </fieldset>
+                <label>
+                  Department notification
+                  <select name="review_department" required></select>
+                </label>
+                <label>
+                  Pharmacist notes
+                  <textarea name="pharmacist_notes" rows="4"></textarea>
+                </label>
+                <fieldset>
+                  <legend>Documentation complete?</legend>
+                  <div class="segmented">
+                    <label><input name="documentation_complete" type="radio" value="yes" required /> Yes</label>
+                    <label><input name="documentation_complete" type="radio" value="no" /> No</label>
+                  </div>
+                </fieldset>
+                <div class="form-actions">
+                  <button class="ghost-button" id="rejectButton" type="button">Return for follow-up</button>
+                  <button class="primary-button" type="submit">Approve and track</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="view-panel hidden" data-panel="metrics">
+            <div class="metrics-toolbar">
+              <label>
+                Month
+                <input id="metricMonth" type="month" />
+              </label>
+              <button class="ghost-button" id="exportButton" type="button">Export CSV</button>
+            </div>
+            <div id="metricCards" class="metric-cards"></div>
+            <div class="report-table-wrap">
+              <table id="metricTable">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Metric</th>
+                    <th>Count</th>
+                    <th>Documentation</th>
+                    <th>Trend status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view-panel hidden" data-panel="admin">
+            <div class="admin-grid">
+              <div>
+                <h3>Supabase Connection</h3>
+                <form id="settingsForm" class="settings-form">
+                  <label>
+                    Supabase URL
+                    <input name="supabaseUrl" type="url" placeholder="https://project.supabase.co" />
+                  </label>
+                  <label>
+                    Supabase anon key
+                    <input name="supabaseAnonKey" type="password" />
+                  </label>
+                  <button class="primary-button" type="submit">Save settings</button>
+                </form>
+              </div>
+              <div>
+                <h3>Roles</h3>
+                <div class="role-table">
+                  <div><strong>Staff</strong><span>Can submit variance reports and view their own drafts.</span></div>
+                  <div><strong>Pharmacist</strong><span>Can approve, classify QREs, route Slack alerts, and print reports.</span></div>
+                  <div><strong>Admin</strong><span>Can manage users in Supabase and has pharmacist permissions.</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
