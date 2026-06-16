@@ -1,5 +1,8 @@
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
+const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+
 const OPTIONS = {
   nature: ["Death", "Injury/Infection", "Adverse drug reaction", "Error", "Complaint", "Facility/equipment", "Material", "Other"],
   source: ["In-person/internal", "Phone", "Email", "Mail", "Other"],
@@ -178,7 +181,9 @@ function setDefaultDates() {
 }
 
 async function connectSupabase() {
-  const { supabaseUrl, supabaseAnonKey } = storage.settings;
+  const supabaseUrl = SUPABASE_URL;
+  const supabaseAnonKey = SUPABASE_ANON_KEY;
+
   els.settingsForm.elements.supabaseUrl.value = supabaseUrl || "";
   els.settingsForm.elements.supabaseAnonKey.value = supabaseAnonKey || "";
 
