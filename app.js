@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
 
@@ -425,7 +425,9 @@ function render() {
   els.viewTitle.textContent = document.querySelector(`.nav-item[data-view="${state.activeView}"]`).textContent;
   const connectionLabel = state.supabase ? "Supabase connected" : "Local demo mode";
   const connectionClass = state.supabase ? "connected" : "demo";
-  els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(state.profile?.title || state.profile?.role || "Staff")}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
+  const roleLabel = formatRole(state.profile?.role);
+  const titleLabel = state.profile?.title && state.profile.title !== roleLabel ? ` - ${state.profile.title}` : "";
+  els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(roleLabel + titleLabel)}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
 
   renderPending();
   renderMetrics();
@@ -438,6 +440,15 @@ function showStatus(message, tone = "success") {
   showStatus.timeoutId = window.setTimeout(() => {
     els.statusBanner.classList.add("hidden");
   }, 5500);
+}
+
+function formatRole(role) {
+  const labels = {
+    admin: "Admin",
+    pharmacist: "Pharmacist",
+    staff: "Staff"
+  };
+  return labels[role] || "Staff";
 }
 
 function renderPending() {
