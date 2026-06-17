@@ -1,6 +1,6 @@
-const SUPABASE_URL = "https://xjprkxxhepalknpxnqlb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqcHJreHhoZXBhbGtucHhucWxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjQ1MjksImV4cCI6MjA5NzIwMDUyOX0.GE1LfJA-sHRCYZpw1m3N8x2uoYBXYxO8d2oUrqSOcOg";
-const SLACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHHXGrplvwRT2OslJj_Nb3H29S71fBZERKd7BamyStkaaKkF8725fxmIZt2UC-A8VOIQ/exec";
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+const SLACK_APPS_SCRIPT_URL = "YOUR-GOOGLE-APPS-SCRIPT-WEB-APP-URL";
 const SLACK_APPS_SCRIPT_TOKEN = "qre-dashboard";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
