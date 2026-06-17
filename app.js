@@ -118,6 +118,7 @@ const els = {
   approvedPreview: document.querySelector("#approvedPreview"),
   printApprovedButton: document.querySelector("#printApprovedButton"),
   printReviewButton: document.querySelector("#printReviewButton"),
+  approveButton: document.querySelector("#approveButton"),
   printReport: document.querySelector("#printReport"),
   qreItems: document.querySelector("#qreItems"),
   metricMonth: document.querySelector("#metricMonth"),
@@ -409,6 +410,7 @@ async function onApprove(event) {
   const record = selectedRecord();
   if (!record) return;
 
+  setApproveButtonState("approving");
   const data = new FormData(event.currentTarget);
   const update = {
     status: "approved",
@@ -422,19 +424,26 @@ async function onApprove(event) {
     reviewed_at: new Date().toISOString()
   };
 
-  await persistUpdate(record.id, update);
-  const slackResult = await notifySlack({ type: "approved", record: { ...record, ...update } });
-  if (!slackResult.ok) {
-    showStatus(`Approved and tracked. Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
-  } else {
-    showStatus("Approved and tracked. Slack notification sent.", "success", { persist: true });
+  try {
+    await persistUpdate(record.id, update);
+    const slackResult = await notifySlack({ type: "approved", record: { ...record, ...update } });
+    if (!slackResult.ok) {
+      showStatus(`Approved and tracked. Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
+    } else {
+      showStatus("Approved and tracked. Slack notification sent.", "success", { persist: true });
+    }
+    state.selectedApprovedId = record.id;
+    state.selectedRecordId = null;
+    els.reviewForm.reset();
+    renderQreItems("clinical");
+    syncAllOtherFields();
+    render();
+    setApproveButtonState("approved");
+  } finally {
+    if (els.approveButton.textContent !== "Approved") {
+      setApproveButtonState("idle");
+    }
   }
-  state.selectedApprovedId = record.id;
-  state.selectedRecordId = null;
-  els.reviewForm.reset();
-  renderQreItems("clinical");
-  syncAllOtherFields();
-  render();
 }
 
 async function onReject() {
@@ -614,6 +623,28 @@ function setVarianceSubmitState(status) {
   els.submitVarianceButton.textContent = "Submit variance";
 }
 
+function setApproveButtonState(status) {
+  window.clearTimeout(setApproveButtonState.timeoutId);
+  els.approveButton.classList.remove("submitted-button");
+
+  if (status === "approving") {
+    els.approveButton.disabled = true;
+    els.approveButton.textContent = "Approving...";
+    return;
+  }
+
+  if (status === "approved") {
+    els.approveButton.disabled = true;
+    els.approveButton.textContent = "Approved";
+    els.approveButton.classList.add("submitted-button");
+    setApproveButtonState.timeoutId = window.setTimeout(() => setApproveButtonState("idle"), 2500);
+    return;
+  }
+
+  els.approveButton.disabled = !selectedRecord();
+  els.approveButton.textContent = "Approve and track";
+}
+
 function showStatus(message, tone = "success", options = {}) {
   els.statusBanner.textContent = message;
   els.statusBanner.className = `status-banner ${tone}`;
@@ -729,11 +760,13 @@ function renderSelectedRecord() {
     els.selectedStatus.textContent = "No record selected";
     els.reviewSummary.innerHTML = "Select a pending report to review.";
     els.printReviewButton.disabled = true;
+    setApproveButtonState("idle");
     return;
   }
 
   els.selectedStatus.textContent = "Ready for pharmacist review";
   els.printReviewButton.disabled = false;
+  setApproveButtonState("idle");
   els.reviewSummary.innerHTML = `
     <div class="preview-header">
       <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
