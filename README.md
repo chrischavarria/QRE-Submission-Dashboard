@@ -20,6 +20,13 @@ Open `index.html` in a browser. Until Supabase settings are saved, the app runs 
 6. Create the Google Apps Script Slack proxy from `apps-script/slack-notify.gs`.
 7. Add the deployed Apps Script web app URL to `SLACK_APPS_SCRIPT_URL` at the top of `app.js`.
 
+For existing Supabase projects created before pharmacist name tracking, run this once in the SQL editor:
+
+```sql
+alter table public.variance_reports
+add column if not exists pharmacist_name text;
+```
+
 ## Slack setup with Google Apps Script
 
 1. Go to <https://script.google.com/> and create a new project.
@@ -40,7 +47,7 @@ Slack notifications are sent only after the pharmacist clicks **Approve and trac
 
 - Staff submit the variance form modeled from Attachment 1.
 - Reports land in Pharmacist Review as `pending`.
-- Pharmacists classify the QRE using the Page 2 categories, select the department, mark documentation status, and approve.
+- Pharmacists classify the QRE using the Page 2 categories, enter their first and last name, select the department, mark documentation status, and approve.
 - Approved records feed the metrics view and print layout.
 
 ## Deployment

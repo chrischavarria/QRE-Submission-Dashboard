@@ -26,6 +26,7 @@ function doPost(e) {
       `Event date: ${record.event_date || 'N/A'}`,
       `Category: ${category}`,
       `Metric item(s): ${qreItems}`,
+      `Approved by: ${record.pharmacist_name || 'N/A'}`,
       `Issue: ${record.complaint || 'No issue text'}`
     ].join('\n');
 

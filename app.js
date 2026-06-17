@@ -415,6 +415,7 @@ async function onApprove(event) {
     qre_category: data.get("qre_category"),
     qre_items: valuesWithOther(data, "qre_items"),
     review_department: valueWithOther(data, "review_department"),
+    pharmacist_name: data.get("pharmacist_name"),
     pharmacist_notes: data.get("pharmacist_notes"),
     documentation_complete: data.get("documentation_complete"),
     reviewed_by: state.user.id,
@@ -791,6 +792,7 @@ function reviewFormToPrintable() {
     qre_category: data.get("qre_category"),
     qre_items: valuesWithOther(data, "qre_items"),
     review_department: valueWithOther(data, "review_department"),
+    pharmacist_name: data.get("pharmacist_name"),
     pharmacist_notes: data.get("pharmacist_notes"),
     documentation_complete: data.get("documentation_complete")
   };
@@ -862,6 +864,7 @@ function printableRecordBody(record, options = {}) {
         ${printItem("QRE category", category)}
         ${printItem("QRE metric item(s)", listValue(record.qre_items))}
         ${printItem("Notification department", record.review_department)}
+        ${printItem("Approved by pharmacist", record.pharmacist_name)}
         ${printItem("Documentation complete", record.documentation_complete)}
         ${printItem("Reviewed at", formatDateTime(record.reviewed_at))}
       </div>

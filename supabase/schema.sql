@@ -44,6 +44,7 @@ create table public.variance_reports (
   qre_category text,
   qre_items text[] not null default '{}',
   review_department text,
+  pharmacist_name text,
   pharmacist_notes text,
   documentation_complete text,
   reviewed_by uuid references auth.users(id),
