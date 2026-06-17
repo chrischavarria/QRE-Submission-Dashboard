@@ -871,7 +871,9 @@ function printableRecordBody(record, options = {}) {
 }
 
 function printItem(label, value) {
-  return `<div class="print-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "N/A")}</strong></div>`;
+  const content = value || "N/A";
+  const spanClass = String(content).length > 32 ? " wide-print-item" : "";
+  return `<div class="print-item${spanClass}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(content)}</strong></div>`;
 }
 
 function printBlock(label, value) {

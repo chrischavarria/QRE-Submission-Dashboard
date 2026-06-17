@@ -1057,10 +1057,10 @@ td {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
-  border-bottom: 2px solid #111;
-  padding-bottom: 12px;
-  margin-bottom: 14px;
+  gap: 12px;
+  border-bottom: 1.5px solid #111;
+  padding-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .print-title p,
@@ -1070,66 +1070,80 @@ td {
 
 .print-title p {
   color: #555;
-  font-size: 11px;
+  font-size: 8.5px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .print-title h1 {
-  font-size: 24px;
+  font-size: 17px;
+  line-height: 1.05;
 }
 
 .print-title span {
   border: 1px solid #111;
   border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12px;
+  padding: 3px 8px;
+  font-size: 9px;
   font-weight: 800;
 }
 
 .print-section {
   break-inside: avoid;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .print-section h2 {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   border-bottom: 1px solid #999;
-  padding-bottom: 4px;
-  font-size: 15px;
+  padding-bottom: 2px;
+  font-size: 10.5px;
+  line-height: 1.1;
 }
 
 .print-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
 }
 
 .print-item,
 .print-block {
   border: 1px solid #bbb;
-  padding: 7px;
+  padding: 3px 4px;
+}
+
+.wide-print-item {
+  grid-column: span 2;
 }
 
 .print-item span,
 .print-block span {
   display: block;
   color: #555;
-  font-size: 10px;
+  font-size: 7.5px;
   font-weight: 800;
   text-transform: uppercase;
+  line-height: 1.1;
 }
 
 .print-item strong,
 .print-block p {
-  margin: 3px 0 0;
+  margin: 1px 0 0;
   color: #111;
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 9px;
+  line-height: 1.18;
 }
 
 .print-block {
-  margin-bottom: 7px;
+  margin-bottom: 3px;
+}
+
+.print-block p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 /* ---------- Responsive ---------- */
@@ -1180,6 +1194,11 @@ td {
 
 /* ---------- Print ---------- */
 @media print {
+  @page {
+    size: letter;
+    margin: 0.28in;
+  }
+
   body.printing-record .app-shell,
   body.printing-record .status-banner {
     display: none !important;
@@ -1188,6 +1207,8 @@ td {
   body.printing-record .print-report {
     display: block;
     padding: 0;
+    color: #111;
+    font-family: Arial, Helvetica, sans-serif;
   }
 
   body.printing-record {
@@ -1217,6 +1238,6 @@ td {
   }
 
   .print-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
