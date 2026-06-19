@@ -116,7 +116,9 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
 
-create view public.monthly_qre_metrics as
+create view public.monthly_qre_metrics
+with (security_invoker = true)
+as
 select
   date_trunc('month', event_date)::date as month,
   qre_category,
