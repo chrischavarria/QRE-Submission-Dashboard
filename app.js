@@ -71,12 +71,6 @@ const QRE_CATEGORIES = {
   }
 };
 
-const DEMO_USERS = [
-  { id: "staff-demo", email: "staff@qre.local", password: "staff123", full_name: "Demo Staff", title: "Staff", role: "staff" },
-  { id: "rph-demo", email: "pharmacist@qre.local", password: "rph123", full_name: "Demo Pharmacist", title: "Pharmacist", role: "pharmacist" },
-  { id: "admin-demo", email: "admin@qre.local", password: "admin123", full_name: "Demo Admin", title: "Admin", role: "admin" }
-];
-
 const state = {
   supabase: null,
   user: null,
@@ -86,15 +80,6 @@ const state = {
   selectedApprovedId: null,
   activeView: "intake",
   isSubmittingVariance: false
-};
-
-const storage = {
-  get records() {
-    return JSON.parse(localStorage.getItem("qre_records") || "[]");
-  },
-  set records(value) {
-    localStorage.setItem("qre_records", JSON.stringify(value));
-  }
 };
 
 const els = {
@@ -247,7 +232,7 @@ async function connectSupabase() {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     state.supabase = createClient(supabaseUrl, supabaseAnonKey);
   } catch (error) {
-    console.warn("Supabase client could not load. Demo mode remains available.", error);
+    console.error("Supabase client could not load.", error);
   }
 }
 
@@ -262,12 +247,6 @@ async function restoreSession() {
     }
   }
 
-  const demoUser = JSON.parse(localStorage.getItem("qre_demo_user") || "null");
-  if (demoUser) {
-    state.user = demoUser;
-    state.profile = demoUser;
-    state.records = storage.records;
-  }
 }
 
 async function onLogin(event) {
@@ -286,15 +265,8 @@ async function onLogin(event) {
     await loadProfile();
     await loadRecords();
   } else {
-    const demoUser = DEMO_USERS.find((candidate) => candidate.email === email && candidate.password === password);
-    if (!demoUser) {
-      els.authNote.textContent = "Demo credentials: staff@qre.local / staff123 or pharmacist@qre.local / rph123.";
-      return;
-    }
-    state.user = demoUser;
-    state.profile = demoUser;
-    localStorage.setItem("qre_demo_user", JSON.stringify(demoUser));
-    state.records = storage.records;
+    els.authNote.textContent = "The secure sign-in service is unavailable. Contact an administrator.";
+    return;
   }
 
   els.loginForm.reset();
@@ -312,10 +284,7 @@ async function loadProfile() {
 }
 
 async function loadRecords() {
-  if (!state.supabase) {
-    state.records = storage.records;
-    return;
-  }
+  if (!state.supabase) return;
 
   const { data, error } = await state.supabase
     .from("variance_reports")
@@ -340,18 +309,17 @@ async function onSubmitVariance(event) {
   const payload = formToVariance(event.currentTarget);
 
   try {
-    if (state.supabase) {
-      const { error } = await state.supabase.from("variance_reports").insert(payload);
-      if (error) {
-        showStatus(error.message, "error");
-        return;
-      }
-      await loadRecords();
-    } else {
-      const next = [{ ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...state.records];
-      state.records = next;
-      storage.records = next;
+    if (!state.supabase) {
+      showStatus("The secure data service is unavailable.", "error");
+      return;
     }
+
+    const { error } = await state.supabase.from("variance_reports").insert(payload);
+    if (error) {
+      showStatus(error.message, "error");
+      return;
+    }
+    await loadRecords();
 
     resetVarianceForm();
     render();
@@ -456,17 +424,17 @@ async function onReject() {
 }
 
 async function persistUpdate(id, update) {
-  if (state.supabase) {
-    const { error } = await state.supabase.from("variance_reports").update(update).eq("id", id);
-    if (error) {
-      showStatus(error.message, "error");
-      return;
-    }
-    await loadRecords();
-  } else {
-    state.records = state.records.map((record) => (record.id === id ? { ...record, ...update } : record));
-    storage.records = state.records;
+  if (!state.supabase) {
+    showStatus("The secure data service is unavailable.", "error");
+    return;
   }
+
+  const { error } = await state.supabase.from("variance_reports").update(update).eq("id", id);
+  if (error) {
+    showStatus(error.message, "error");
+    return;
+  }
+  await loadRecords();
 }
 
 async function deleteSubmission(id) {
@@ -477,17 +445,17 @@ async function deleteSubmission(id) {
   const label = `${record.reported_by || "submission"} from ${record.event_date || "unknown date"}`;
   if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
 
-  if (state.supabase) {
-    const { error } = await state.supabase.from("variance_reports").delete().eq("id", id);
-    if (error) {
-      showStatus(error.message, "error");
-      return;
-    }
-    await loadRecords();
-  } else {
-    state.records = state.records.filter((candidate) => candidate.id !== id);
-    storage.records = state.records;
+  if (!state.supabase) {
+    showStatus("The secure data service is unavailable.", "error");
+    return;
   }
+
+  const { error } = await state.supabase.from("variance_reports").delete().eq("id", id);
+  if (error) {
+    showStatus(error.message, "error");
+    return;
+  }
+  await loadRecords();
 
   if (state.selectedRecordId === id) state.selectedRecordId = null;
   render();
@@ -527,7 +495,6 @@ function requireAdmin() {
 
 async function signOut() {
   if (state.supabase) await state.supabase.auth.signOut();
-  localStorage.removeItem("qre_demo_user");
   state.user = null;
   state.profile = null;
   state.records = [];
@@ -547,7 +514,7 @@ function render() {
   document.querySelector("#printButton").classList.toggle("hidden", !signedIn);
 
   if (!signedIn) {
-    els.sessionCard.innerHTML = "Demo mode is available until Supabase settings are saved.<br><br>staff@qre.local / staff123<br>pharmacist@qre.local / rph123";
+    els.sessionCard.innerHTML = "Sign in with your authorized pharmacy account.";
     return;
   }
 
@@ -559,8 +526,8 @@ function render() {
   });
 
   els.viewTitle.textContent = document.querySelector(`.nav-item[data-view="${state.activeView}"]`).textContent;
-  const connectionLabel = state.supabase ? "Supabase connected" : "Local demo mode";
-  const connectionClass = state.supabase ? "connected" : "demo";
+  const connectionLabel = "Supabase connected";
+  const connectionClass = "connected";
   const roleLabel = formatRole(state.profile?.role);
   const titleLabel = state.profile?.title && state.profile.title !== roleLabel ? ` - ${state.profile.title}` : "";
   els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(roleLabel + titleLabel)}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
