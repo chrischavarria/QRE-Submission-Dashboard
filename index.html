@@ -106,8 +106,8 @@
           <section class="view-panel" data-panel="intake">
             <form id="varianceForm" class="form-grid">
               <div class="section-heading">
-                <h3>Variance Report</h3>
-                <span class="status-pill">Draft</span>
+                <h3 id="varianceFormTitle">Variance Report</h3>
+                <span class="status-pill" id="varianceFormStatus">Draft</span>
               </div>
 
               <label>
@@ -257,6 +257,7 @@
 
               <div class="form-actions wide">
                 <button class="ghost-button" id="resetFormButton" type="button">Reset</button>
+                <button class="ghost-button hidden" id="cancelEditButton" type="button">Cancel edit</button>
                 <button class="primary-button" id="submitVarianceButton" type="submit">Submit variance</button>
               </div>
             </form>
@@ -314,6 +315,7 @@
                   </div>
                 </fieldset>
                 <div class="form-actions">
+                  <button class="ghost-button" id="editSubmissionButton" type="button" disabled>Edit submission</button>
                   <button class="ghost-button" id="printReviewButton" type="button">Print selected</button>
                   <button class="ghost-button" id="rejectButton" type="button">Return for follow-up</button>
                   <button class="primary-button" id="approveButton" type="submit">Approve and track</button>

@@ -78,6 +78,7 @@ const state = {
   records: [],
   selectedRecordId: null,
   selectedApprovedId: null,
+  editingRecordId: null,
   activeView: "intake",
   isSubmittingVariance: false
 };
@@ -91,6 +92,9 @@ const els = {
   sessionCard: document.querySelector("#sessionCard"),
   statusBanner: document.querySelector("#statusBanner"),
   submitVarianceButton: document.querySelector("#submitVarianceButton"),
+  varianceFormTitle: document.querySelector("#varianceFormTitle"),
+  varianceFormStatus: document.querySelector("#varianceFormStatus"),
+  cancelEditButton: document.querySelector("#cancelEditButton"),
   authNote: document.querySelector("#authNote"),
   viewTitle: document.querySelector("#viewTitle"),
   pendingList: document.querySelector("#pendingList"),
@@ -103,6 +107,7 @@ const els = {
   approvedPreview: document.querySelector("#approvedPreview"),
   printApprovedButton: document.querySelector("#printApprovedButton"),
   printReviewButton: document.querySelector("#printReviewButton"),
+  editSubmissionButton: document.querySelector("#editSubmissionButton"),
   approveButton: document.querySelector("#approveButton"),
   printReport: document.querySelector("#printReport"),
   qreItems: document.querySelector("#qreItems"),
@@ -156,9 +161,15 @@ function bindEvents() {
   document.querySelector("#printButton").addEventListener("click", onPrintCurrentView);
   document.querySelector("#signOutButton").addEventListener("click", signOut);
   document.querySelector("#resetFormButton").addEventListener("click", () => {
-    resetVarianceForm();
+    if (state.editingRecordId) {
+      const record = state.records.find((candidate) => candidate.id === state.editingRecordId);
+      if (record) populateVarianceForm(record);
+    } else {
+      resetVarianceForm();
+    }
     setVarianceSubmitState("idle");
   });
+  els.cancelEditButton.addEventListener("click", cancelVarianceEdit);
   els.varianceForm.addEventListener("input", () => setVarianceSubmitState("idle"));
   els.varianceForm.addEventListener("change", () => setVarianceSubmitState("idle"));
 
@@ -166,6 +177,7 @@ function bindEvents() {
   els.varianceForm.addEventListener("submit", onSubmitVariance);
   els.reviewForm.addEventListener("submit", onApprove);
   document.querySelector("#rejectButton").addEventListener("click", onReject);
+  els.editSubmissionButton.addEventListener("click", startVarianceEdit);
   els.printReviewButton.addEventListener("click", () => {
     const record = selectedRecord();
     if (!record) {
@@ -307,6 +319,7 @@ async function onSubmitVariance(event) {
   showStatus("Submitting variance...", "info", { persist: true });
 
   const payload = formToVariance(event.currentTarget);
+  const editingRecord = state.records.find((record) => record.id === state.editingRecordId);
 
   try {
     if (!state.supabase) {
@@ -314,18 +327,31 @@ async function onSubmitVariance(event) {
       return;
     }
 
-    const { error } = await state.supabase.from("variance_reports").insert(payload);
-    if (error) {
-      showStatus(error.message, "error");
-      return;
+    if (editingRecord) {
+      const { submitted_by, status, ...update } = payload;
+      const saved = await persistUpdate(editingRecord.id, update);
+      if (!saved) return;
+    } else {
+      const { error } = await state.supabase.from("variance_reports").insert(payload);
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      await loadRecords();
     }
-    await loadRecords();
 
     resetVarianceForm();
+    const wasEditing = Boolean(editingRecord);
+    state.editingRecordId = null;
+    if (wasEditing) state.activeView = "review";
     render();
     state.isSubmittingVariance = false;
-    setVarianceSubmitState("submitted");
-    showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
+    if (wasEditing) {
+      showStatus("Submission changes saved. Continue with pharmacist review.", "success", { persist: true });
+    } else {
+      setVarianceSubmitState("submitted");
+      showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
+    }
   } finally {
     if (state.isSubmittingVariance) {
       state.isSubmittingVariance = false;
@@ -338,6 +364,71 @@ function resetVarianceForm() {
   els.varianceForm.reset();
   setDefaultDates();
   syncAllOtherFields();
+}
+
+function startVarianceEdit() {
+  if (!requirePharmacist()) return;
+  const record = selectedRecord();
+  if (!record) return;
+
+  state.editingRecordId = record.id;
+  populateVarianceForm(record);
+  state.activeView = "intake";
+  render();
+  setVarianceSubmitState("idle");
+}
+
+function cancelVarianceEdit() {
+  if (!state.editingRecordId) return;
+  state.editingRecordId = null;
+  resetVarianceForm();
+  state.activeView = "review";
+  render();
+  showStatus("Editing cancelled. The submitted variance was not changed.", "info");
+}
+
+function populateVarianceForm(record) {
+  const form = els.varianceForm;
+  form.reset();
+
+  [
+    "event_date", "event_time", "reported_by", "patient_identifier", "staff_names", "complainants",
+    "drug_details", "complaint", "investigation", "resolution", "follow_up", "completed_by"
+  ].forEach((name) => {
+    form.elements[name].value = record[name] || "";
+  });
+
+  setSelectValueWithOther(form, "department", record.department);
+  ["patient_involved", "staff_involved", "drug_involved", "drug_recalled", "patient_notified", "prescriber_notified"].forEach((name) => {
+    setRadioValue(form, name, record[name]);
+  });
+  ["nature", "source", "issue", "failure"].forEach((name) => setCheckboxValuesWithOther(form, name, record[name]));
+}
+
+function setRadioValue(form, name, value) {
+  form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = input.value === value;
+  });
+}
+
+function setSelectValueWithOther(form, name, value) {
+  const select = form.elements[name];
+  const otherPrefix = "Other: ";
+  const isOther = typeof value === "string" && value.startsWith(otherPrefix);
+  select.value = isOther ? "Other" : (value || DEPARTMENTS[0]);
+  form.elements[`${name}_other`].value = isOther ? value.slice(otherPrefix.length) : "";
+  syncOtherField(name, isOther);
+}
+
+function setCheckboxValuesWithOther(form, name, values) {
+  const selected = Array.isArray(values) ? values : [];
+  const otherPrefix = "Other: ";
+  const otherValue = selected.find((value) => value.startsWith(otherPrefix));
+  form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = selected.includes(input.value) || (input.value === "Other" && Boolean(otherValue));
+  });
+  form.elements[`${name}_other`].value = otherValue ? otherValue.slice(otherPrefix.length) : "";
+  syncOtherField(name, Boolean(otherValue));
 }
 
 function formToVariance(form) {
@@ -393,7 +484,8 @@ async function onApprove(event) {
   };
 
   try {
-    await persistUpdate(record.id, update);
+    const saved = await persistUpdate(record.id, update);
+    if (!saved) return;
     const slackResult = await notifySlack({ type: "approved", record: { ...record, ...update } });
     if (!slackResult.ok) {
       showStatus(`Approved and tracked. Slack notification was not sent: ${slackResult.reason}.`, "warning", { persist: true });
@@ -418,7 +510,8 @@ async function onReject() {
   if (!requirePharmacist()) return;
   const record = selectedRecord();
   if (!record) return;
-  await persistUpdate(record.id, { status: "returned", reviewed_by: state.user.id, reviewed_at: new Date().toISOString() });
+  const saved = await persistUpdate(record.id, { status: "returned", reviewed_by: state.user.id, reviewed_at: new Date().toISOString() });
+  if (!saved) return;
   state.selectedRecordId = null;
   render();
 }
@@ -426,15 +519,16 @@ async function onReject() {
 async function persistUpdate(id, update) {
   if (!state.supabase) {
     showStatus("The secure data service is unavailable.", "error");
-    return;
+    return false;
   }
 
   const { error } = await state.supabase.from("variance_reports").update(update).eq("id", id);
   if (error) {
     showStatus(error.message, "error");
-    return;
+    return false;
   }
   await loadRecords();
+  return true;
 }
 
 async function deleteSubmission(id) {
@@ -481,10 +575,13 @@ async function notifySlack(payload) {
 }
 
 function requirePharmacist() {
-  const role = state.profile?.role;
-  if (role === "pharmacist" || role === "admin") return true;
+  if (hasPharmacistAccess()) return true;
   showStatus("A pharmacist or admin login is required for approval.", "error");
   return false;
+}
+
+function hasPharmacistAccess() {
+  return state.profile?.role === "pharmacist" || state.profile?.role === "admin";
 }
 
 function requireAdmin() {
@@ -508,6 +605,7 @@ function switchView(view) {
 
 function render() {
   const signedIn = Boolean(state.user);
+  renderVarianceFormMode();
   els.authView.classList.toggle("hidden", signedIn);
   els.dashboardView.classList.toggle("hidden", !signedIn);
   document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);
@@ -571,10 +669,11 @@ function onPrintCurrentView() {
 function setVarianceSubmitState(status) {
   window.clearTimeout(setVarianceSubmitState.timeoutId);
   els.submitVarianceButton.classList.remove("submitted-button");
+  const isEditing = Boolean(state.editingRecordId);
 
   if (status === "submitting") {
     els.submitVarianceButton.disabled = true;
-    els.submitVarianceButton.textContent = "Submitting...";
+    els.submitVarianceButton.textContent = isEditing ? "Saving changes..." : "Submitting...";
     return;
   }
 
@@ -587,7 +686,15 @@ function setVarianceSubmitState(status) {
   }
 
   els.submitVarianceButton.disabled = false;
-  els.submitVarianceButton.textContent = "Submit variance";
+  els.submitVarianceButton.textContent = isEditing ? "Save changes" : "Submit variance";
+}
+
+function renderVarianceFormMode() {
+  const isEditing = Boolean(state.editingRecordId);
+  els.varianceFormTitle.textContent = isEditing ? "Edit Pending Variance" : "Variance Report";
+  els.varianceFormStatus.textContent = isEditing ? "Editing pending submission" : "Draft";
+  els.cancelEditButton.classList.toggle("hidden", !isEditing);
+  document.querySelector("#resetFormButton").textContent = isEditing ? "Reset changes" : "Reset";
 }
 
 function setApproveButtonState(status) {
@@ -727,12 +834,16 @@ function renderSelectedRecord() {
     els.selectedStatus.textContent = "No record selected";
     els.reviewSummary.innerHTML = "Select a pending report to review.";
     els.printReviewButton.disabled = true;
+    els.editSubmissionButton.disabled = true;
+    els.editSubmissionButton.classList.toggle("hidden", !hasPharmacistAccess());
     setApproveButtonState("idle");
     return;
   }
 
   els.selectedStatus.textContent = "Ready for pharmacist review";
   els.printReviewButton.disabled = false;
+  els.editSubmissionButton.disabled = !hasPharmacistAccess();
+  els.editSubmissionButton.classList.toggle("hidden", !hasPharmacistAccess());
   setApproveButtonState("idle");
   els.reviewSummary.innerHTML = `
     <div class="preview-header">
