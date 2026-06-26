@@ -18,10 +18,14 @@ function doPost(e) {
     const statusText = payload.type === 'approved' ? 'approved and tracked' : 'submitted';
     const category = record.qre_category || 'Pending review';
     const qreItems = Array.isArray(record.qre_items) ? record.qre_items.join(', ') : 'Not selected';
+    const complaintSource = record.complaint_source
+      ? `${record.complaint_source}${record.complaint_source === 'External' && record.shipped_to_state ? ` - ${record.shipped_to_state}` : ''}`
+      : 'N/A';
 
     const text = [
       `QRE variance ${statusText}`,
       `Department: ${department}`,
+      `Complaint source: ${complaintSource}`,
       `Reported by: ${record.reported_by || 'N/A'}`,
       `Event date: ${record.event_date || 'N/A'}`,
       `Category: ${category}`,

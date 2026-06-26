@@ -165,10 +165,13 @@
 
               <fieldset class="wide">
                 <legend>Source of complaint</legend>
-                <div class="check-grid" data-checkboxes="source"></div>
-                <label class="conditional-field hidden" data-other-field="source">
-                  Other source
-                  <input name="source_other" type="text" />
+                <div class="segmented">
+                  <label><input name="complaint_source" type="radio" value="Internal" required /> Internal</label>
+                  <label><input name="complaint_source" type="radio" value="External" /> External</label>
+                </div>
+                <label class="conditional-field hidden" data-other-field="complaint_source_external">
+                  State shipped to
+                  <select name="shipped_to_state"></select>
                 </label>
               </fieldset>
 

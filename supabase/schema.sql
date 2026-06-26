@@ -28,6 +28,8 @@ create table public.variance_reports (
   staff_names text,
   nature text[] not null default '{}',
   source text[] not null default '{}',
+  complaint_source text,
+  shipped_to_state text,
   complainants text,
   drug_involved text,
   drug_details text,
@@ -121,6 +123,7 @@ with (security_invoker = true)
 as
 select
   date_trunc('month', event_date)::date as month,
+  complaint_source,
   qre_category,
   item as qre_item,
   count(*) as total,
@@ -128,4 +131,4 @@ select
 from public.variance_reports
 cross join unnest(qre_items) as item
 where status = 'approved'
-group by 1, 2, 3;
+group by 1, 2, 3, 4;

@@ -4,6 +4,14 @@ const SLACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHHXGrpl
 const SLACK_APPS_SCRIPT_TOKEN = "qre-dashboard";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+  "DC"
+];
 
 const OPTIONS = {
   nature: ["Death", "Injury/Infection", "Adverse drug reaction", "Error", "Complaint", "Facility/equipment", "Material", "Other"],
@@ -17,6 +25,7 @@ const OPTIONS = {
     "Packaging",
     "Labeling",
     "Directions",
+    "Data Entry",
     "QC Result",
     "Potency",
     "Shipping, delivery, or receipt",
@@ -142,6 +151,11 @@ function hydrateStaticControls() {
     select.innerHTML = DEPARTMENTS.map((department) => `<option>${department}</option>`).join("");
   });
 
+  els.varianceForm.elements.shipped_to_state.innerHTML = [
+    `<option value="">Select state</option>`,
+    ...US_STATES.map((stateCode) => `<option>${stateCode}</option>`)
+  ].join("");
+
   const categorySelect = els.reviewForm.elements.qre_category;
   categorySelect.innerHTML = Object.entries(QRE_CATEGORIES)
     .map(([key, value]) => `<option value="${key}">${value.label}</option>`)
@@ -215,6 +229,10 @@ function onOtherControlChange(event) {
   if (target.tagName === "SELECT") {
     syncOtherField(target.name, target.value === "Other");
   }
+
+  if (target.name === "complaint_source") {
+    syncComplaintSourceField(target.value === "External");
+  }
 }
 
 function syncOtherField(name, isVisible) {
@@ -225,6 +243,16 @@ function syncOtherField(name, isVisible) {
   field.classList.toggle("hidden", !isVisible);
   input.required = isVisible;
   if (!isVisible) input.value = "";
+}
+
+function syncComplaintSourceField(isExternal) {
+  const field = document.querySelector('[data-other-field="complaint_source_external"]');
+  if (!field) return;
+
+  const select = field.querySelector("select");
+  field.classList.toggle("hidden", !isExternal);
+  select.required = isExternal;
+  if (!isExternal) select.value = "";
 }
 
 async function connectSupabase() {
@@ -364,6 +392,7 @@ function resetVarianceForm() {
   els.varianceForm.reset();
   setDefaultDates();
   syncAllOtherFields();
+  syncComplaintSourceField(false);
 }
 
 function startVarianceEdit() {
@@ -393,7 +422,7 @@ function populateVarianceForm(record) {
 
   [
     "event_date", "event_time", "reported_by", "patient_identifier", "staff_names", "complainants",
-    "drug_details", "complaint", "investigation", "resolution", "follow_up", "completed_by"
+    "shipped_to_state", "drug_details", "complaint", "investigation", "resolution", "follow_up", "completed_by"
   ].forEach((name) => {
     form.elements[name].value = record[name] || "";
   });
@@ -402,7 +431,10 @@ function populateVarianceForm(record) {
   ["patient_involved", "staff_involved", "drug_involved", "drug_recalled", "patient_notified", "prescriber_notified"].forEach((name) => {
     setRadioValue(form, name, record[name]);
   });
+  const sourceValue = recordComplaintSource(record);
+  setRadioValue(form, "complaint_source", sourceValue);
   ["nature", "source", "issue", "failure"].forEach((name) => setCheckboxValuesWithOther(form, name, record[name]));
+  syncComplaintSourceField(sourceValue === "External");
 }
 
 function setRadioValue(form, name, value) {
@@ -427,6 +459,7 @@ function setCheckboxValuesWithOther(form, name, values) {
   form.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
     input.checked = selected.includes(input.value) || (input.value === "Other" && Boolean(otherValue));
   });
+  if (!form.elements[`${name}_other`]) return;
   form.elements[`${name}_other`].value = otherValue ? otherValue.slice(otherPrefix.length) : "";
   syncOtherField(name, Boolean(otherValue));
 }
@@ -443,7 +476,9 @@ function formToVariance(form) {
     staff_involved: data.get("staff_involved"),
     staff_names: data.get("staff_names"),
     nature: valuesWithOther(data, "nature"),
-    source: valuesWithOther(data, "source"),
+    complaint_source: data.get("complaint_source"),
+    shipped_to_state: data.get("complaint_source") === "External" ? data.get("shipped_to_state") : "",
+    source: data.get("complaint_source") ? [data.get("complaint_source")] : valuesWithOther(data, "source"),
     complainants: data.get("complainants"),
     drug_involved: data.get("drug_involved"),
     drug_details: data.get("drug_details"),
@@ -858,7 +893,7 @@ function renderSelectedRecord() {
       ${previewItem("Staff involved", record.staff_involved)}
       ${previewItem("Staff names", record.staff_names)}
       ${previewItem("Nature", listValue(record.nature))}
-      ${previewItem("Source", listValue(record.source))}
+      ${previewItem("Complaint source", complaintSourceLabel(record))}
       ${previewItem("Complainants", record.complainants)}
       ${previewItem("Drug involved", record.drug_involved)}
       ${previewItem("Drug details", record.drug_details)}
@@ -895,6 +930,23 @@ function previewItem(label, value) {
 
 function listValue(value) {
   return Array.isArray(value) && value.length ? value.join(", ") : "";
+}
+
+function recordComplaintSource(record) {
+  if (record.complaint_source) return record.complaint_source;
+  const legacySource = Array.isArray(record.source) ? record.source[0] : "";
+  if (legacySource === "Internal" || legacySource === "External") return legacySource;
+  if (legacySource === "In-person/internal") return "Internal";
+  return "";
+}
+
+function complaintSourceLabel(record) {
+  const source = recordComplaintSource(record);
+  if (!source) return listValue(record.source);
+  if (source === "External" && record.shipped_to_state) {
+    return `${source} - ${record.shipped_to_state}`;
+  }
+  return source;
 }
 
 function reviewFormToPrintable() {
@@ -948,7 +1000,7 @@ function printableRecordBody(record, options = {}) {
       <h2>Variance Classification</h2>
       <div class="print-grid">
         ${printItem("Nature of variance", listValue(record.nature))}
-        ${printItem("Source of complaint", listValue(record.source))}
+        ${printItem("Source of complaint", complaintSourceLabel(record))}
         ${printItem("Complainant(s)", record.complainants)}
         ${printItem("Drug involved", record.drug_involved)}
         ${printItem("Name / strength of drug(s)", record.drug_details)}
@@ -1053,6 +1105,17 @@ function renderMetrics() {
   });
 
   const rows = [];
+  ["Internal", "External"].forEach((source) => {
+    const matching = approved.filter((record) => recordComplaintSource(record) === source);
+    rows.push({
+      category: "Complaint Source",
+      item: source,
+      count: matching.length,
+      documentation: documentationRate(matching),
+      trend: matching.length > 5 ? "Investigate trend" : "Within threshold"
+    });
+  });
+
   Object.entries(QRE_CATEGORIES).forEach(([key, category]) => {
     category.items.forEach((item) => {
       const matching = approved.filter((record) => record.qre_category === key && includesMetricItem(record.qre_items || [], item));
@@ -1070,8 +1133,8 @@ function renderMetrics() {
   els.metricCards.innerHTML = `
     <div class="metric-card"><strong>${approved.length}</strong><p>Total QREs</p></div>
     <div class="metric-card"><strong>${docsComplete}</strong><p>Documentation complete</p></div>
-    <div class="metric-card"><strong>${approved.filter((record) => record.qre_category === "complaints").length}</strong><p>Patient complaints</p></div>
-    <div class="metric-card"><strong>${approved.filter((record) => record.qre_category === "internal").length}</strong><p>Internal events</p></div>
+    <div class="metric-card"><strong>${approved.filter((record) => recordComplaintSource(record) === "Internal").length}</strong><p>Internal complaints</p></div>
+    <div class="metric-card"><strong>${approved.filter((record) => recordComplaintSource(record) === "External").length}</strong><p>External complaints</p></div>
   `;
 
   els.metricTableBody.innerHTML = rows
@@ -1105,6 +1168,24 @@ function renderTrendTable(months) {
   els.trendRange.textContent = `${formatMonthLabel(months[0])} - ${formatMonthLabel(months[2])}`;
 
   const rows = [];
+  ["Internal", "External"].forEach((source) => {
+    const counts = months.map((monthKey) => {
+      return approved.filter((record) => {
+        return (record.event_date || "").startsWith(monthKey) &&
+          recordComplaintSource(record) === source;
+      }).length;
+    });
+
+    if (counts.some((count) => count > 0)) {
+      rows.push({
+        category: "Complaint Source",
+        item: source,
+        counts,
+        trend: trendLabel(counts)
+      });
+    }
+  });
+
   Object.entries(QRE_CATEGORIES).forEach(([key, category]) => {
     category.items.forEach((item) => {
       const counts = months.map((monthKey) => {
