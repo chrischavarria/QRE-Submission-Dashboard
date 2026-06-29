@@ -175,6 +175,21 @@
                 </label>
               </fieldset>
 
+              <fieldset class="wide">
+                <legend>Origin of complaint</legend>
+                <div class="segmented">
+                  <label><input name="origin_of_complaint" type="radio" value="In-person" required /> In-person</label>
+                  <label><input name="origin_of_complaint" type="radio" value="Phone" /> Phone</label>
+                  <label><input name="origin_of_complaint" type="radio" value="Email" /> Email</label>
+                  <label><input name="origin_of_complaint" type="radio" value="Mail" /> Mail</label>
+                  <label><input name="origin_of_complaint" type="radio" value="Other" /> Other</label>
+                </div>
+                <label class="conditional-field hidden" data-other-field="origin_of_complaint">
+                  Other origin
+                  <input name="origin_of_complaint_other" type="text" />
+                </label>
+              </fieldset>
+
               <label class="wide">
                 Complainant(s)
                 <input name="complainants" type="text" />

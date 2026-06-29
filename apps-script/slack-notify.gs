@@ -26,6 +26,7 @@ function doPost(e) {
       `QRE variance ${statusText}`,
       `Department: ${department}`,
       `Complaint source: ${complaintSource}`,
+      `Origin of complaint: ${record.origin_of_complaint || 'N/A'}`,
       `Reported by: ${record.reported_by || 'N/A'}`,
       `Event date: ${record.event_date || 'N/A'}`,
       `Category: ${category}`,

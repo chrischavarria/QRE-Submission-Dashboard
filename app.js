@@ -233,6 +233,10 @@ function onOtherControlChange(event) {
   if (target.name === "complaint_source") {
     syncComplaintSourceField(target.value === "External");
   }
+
+  if (target.name === "origin_of_complaint") {
+    syncOtherField(target.name, target.value === "Other");
+  }
 }
 
 function syncOtherField(name, isVisible) {
@@ -433,6 +437,7 @@ function populateVarianceForm(record) {
   });
   const sourceValue = recordComplaintSource(record);
   setRadioValue(form, "complaint_source", sourceValue);
+  setRadioValueWithOther(form, "origin_of_complaint", record.origin_of_complaint);
   ["nature", "source", "issue", "failure"].forEach((name) => setCheckboxValuesWithOther(form, name, record[name]));
   syncComplaintSourceField(sourceValue === "External");
 }
@@ -448,6 +453,14 @@ function setSelectValueWithOther(form, name, value) {
   const otherPrefix = "Other: ";
   const isOther = typeof value === "string" && value.startsWith(otherPrefix);
   select.value = isOther ? "Other" : (value || DEPARTMENTS[0]);
+  form.elements[`${name}_other`].value = isOther ? value.slice(otherPrefix.length) : "";
+  syncOtherField(name, isOther);
+}
+
+function setRadioValueWithOther(form, name, value) {
+  const otherPrefix = "Other: ";
+  const isOther = typeof value === "string" && value.startsWith(otherPrefix);
+  setRadioValue(form, name, isOther ? "Other" : value);
   form.elements[`${name}_other`].value = isOther ? value.slice(otherPrefix.length) : "";
   syncOtherField(name, isOther);
 }
@@ -478,6 +491,7 @@ function formToVariance(form) {
     nature: valuesWithOther(data, "nature"),
     complaint_source: data.get("complaint_source"),
     shipped_to_state: data.get("complaint_source") === "External" ? data.get("shipped_to_state") : "",
+    origin_of_complaint: valueWithOther(data, "origin_of_complaint"),
     source: data.get("complaint_source") ? [data.get("complaint_source")] : valuesWithOther(data, "source"),
     complainants: data.get("complainants"),
     drug_involved: data.get("drug_involved"),
@@ -894,6 +908,7 @@ function renderSelectedRecord() {
       ${previewItem("Staff names", record.staff_names)}
       ${previewItem("Nature", listValue(record.nature))}
       ${previewItem("Complaint source", complaintSourceLabel(record))}
+      ${previewItem("Origin of complaint", record.origin_of_complaint)}
       ${previewItem("Complainants", record.complainants)}
       ${previewItem("Drug involved", record.drug_involved)}
       ${previewItem("Drug details", record.drug_details)}
@@ -1001,6 +1016,7 @@ function printableRecordBody(record, options = {}) {
       <div class="print-grid">
         ${printItem("Nature of variance", listValue(record.nature))}
         ${printItem("Source of complaint", complaintSourceLabel(record))}
+        ${printItem("Origin of complaint", record.origin_of_complaint)}
         ${printItem("Complainant(s)", record.complainants)}
         ${printItem("Drug involved", record.drug_involved)}
         ${printItem("Name / strength of drug(s)", record.drug_details)}
@@ -1091,7 +1107,7 @@ function valueWithOther(data, name) {
 }
 
 function syncAllOtherFields() {
-  ["department", "nature", "source", "issue", "failure", "qre_items", "review_department"].forEach((name) => {
+  ["department", "nature", "source", "issue", "failure", "origin_of_complaint", "qre_items", "review_department"].forEach((name) => {
     syncOtherField(name, false);
   });
 }

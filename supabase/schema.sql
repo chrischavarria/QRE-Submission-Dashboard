@@ -30,6 +30,7 @@ create table public.variance_reports (
   source text[] not null default '{}',
   complaint_source text,
   shipped_to_state text,
+  origin_of_complaint text,
   complainants text,
   drug_involved text,
   drug_details text,
