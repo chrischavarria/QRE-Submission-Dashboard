@@ -348,7 +348,11 @@
                 Month
                 <input id="metricMonth" type="month" />
               </label>
-              <button class="ghost-button" id="exportButton" type="button">Export CSV</button>
+              <div class="metrics-actions">
+                <input class="hidden" id="historicalCsvInput" type="file" accept=".csv,text/csv" />
+                <button class="ghost-button hidden" id="importHistoricalButton" type="button">Import historical CSV</button>
+                <button class="ghost-button" id="exportButton" type="button">Export CSV</button>
+              </div>
             </div>
             <div id="metricCards" class="metric-cards"></div>
             <div class="report-table-wrap">

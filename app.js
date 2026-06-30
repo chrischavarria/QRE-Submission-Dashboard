@@ -127,7 +127,9 @@ const els = {
   trendRange: document.querySelector("#trendRange"),
   trendMonthOne: document.querySelector("#trendMonthOne"),
   trendMonthTwo: document.querySelector("#trendMonthTwo"),
-  trendMonthThree: document.querySelector("#trendMonthThree")
+  trendMonthThree: document.querySelector("#trendMonthThree"),
+  historicalCsvInput: document.querySelector("#historicalCsvInput"),
+  importHistoricalButton: document.querySelector("#importHistoricalButton")
 };
 
 init();
@@ -205,6 +207,8 @@ function bindEvents() {
   document.addEventListener("change", onOtherControlChange);
   els.metricMonth.addEventListener("change", renderMetrics);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
+  els.importHistoricalButton.addEventListener("click", () => els.historicalCsvInput.click());
+  els.historicalCsvInput.addEventListener("change", onImportHistoricalCsv);
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("printing-record");
     els.printReport.innerHTML = "";
@@ -678,6 +682,7 @@ function render() {
   const roleLabel = formatRole(state.profile?.role);
   const titleLabel = state.profile?.title && state.profile.title !== roleLabel ? ` - ${state.profile.title}` : "";
   els.sessionCard.innerHTML = `<strong>${escapeHtml(state.profile?.full_name || state.user.email)}</strong><br>${escapeHtml(roleLabel + titleLabel)}<br><span class="connection-pill ${connectionClass}">${connectionLabel}</span>`;
+  els.importHistoricalButton.classList.toggle("hidden", state.profile?.role !== "admin");
 
   renderPending();
   renderApprovedArchive();
@@ -1233,6 +1238,268 @@ function renderTrendTable(months) {
         <td>${escapeHtml(row.trend)}</td>
       </tr>`).join("")
     : `<tr><td colspan="6">No approved QRE metrics in this 3-month range.</td></tr>`;
+}
+
+async function onImportHistoricalCsv(event) {
+  if (!requireAdmin()) return;
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+
+  if (!state.supabase) {
+    showStatus("The secure data service is unavailable.", "error");
+    return;
+  }
+
+  try {
+    showStatus("Reading historical CSV...", "info", { persist: true });
+    const text = await readFileAsText(file);
+    const rows = parseCsv(text);
+    const payloads = rows
+      .map(mapHistoricalCsvRow)
+      .filter(Boolean)
+      .filter((payload) => !hasHistoricalDuplicate(payload));
+
+    if (!payloads.length) {
+      showStatus("No new historical QRE rows were found to import.", "warning", { persist: true });
+      return;
+    }
+
+    const confirmed = window.confirm(`Import ${payloads.length} approved historical QRE record(s)? Slack notifications will not be sent.`);
+    if (!confirmed) {
+      showStatus("Historical CSV import cancelled.", "info");
+      return;
+    }
+
+    els.importHistoricalButton.disabled = true;
+    for (let index = 0; index < payloads.length; index += 100) {
+      const chunk = payloads.slice(index, index + 100);
+      const { error } = await state.supabase.from("variance_reports").insert(chunk);
+      if (error) {
+        showStatus(error.message, "error", { persist: true });
+        return;
+      }
+    }
+
+    await loadRecords();
+    render();
+    showStatus(`Imported ${payloads.length} approved historical QRE record(s). Metrics have been refreshed.`, "success", { persist: true });
+  } catch (error) {
+    console.error(error);
+    showStatus(`Historical CSV import failed: ${error.message}`, "error", { persist: true });
+  } finally {
+    els.importHistoricalButton.disabled = false;
+  }
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("Unable to read file.")));
+    reader.readAsText(file, "windows-1252");
+  });
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  const headers = rows.shift()?.map((header) => header.trim()) || [];
+  return rows.map((values) => {
+    return headers.reduce((record, header, index) => {
+      record[header] = (values[index] || "").trim();
+      return record;
+    }, {});
+  });
+}
+
+function mapHistoricalCsvRow(row) {
+  const eventDate = parseHistoricalDate(row.Date);
+  const complaint = row.Notes?.trim();
+  const qreCategory = mapHistoricalCategory(row.Section, row["Error Type"]);
+  const qreItem = mapHistoricalQreItem(row["Error Type"], qreCategory);
+
+  if (!eventDate || !complaint || !qreCategory || !qreItem) return null;
+
+  const complaintSource = normalizeComplaintSource(row["Internal vs External"]);
+  const department = mapHistoricalDepartment(row.Section);
+  const issue = mapHistoricalIssue(row.Section, row["Error Type"]);
+  const identifierParts = [row["RX #"], row["Formula ID"]].filter(Boolean);
+
+  return {
+    event_date: eventDate,
+    reported_by: row.Employee || "Historical import",
+    department,
+    patient_involved: row["RX #"] ? "yes" : "na",
+    patient_identifier: identifierParts.join(" / "),
+    staff_involved: row.Employee ? "yes" : "na",
+    staff_names: row.Employee || "",
+    nature: ["Error"],
+    source: complaintSource ? [complaintSource] : [],
+    complaint_source: complaintSource,
+    shipped_to_state: complaintSource === "External" ? row["Ship to State"] : "",
+    origin_of_complaint: "",
+    complainants: "",
+    drug_involved: row["Formula ID"] || row["RX #"] ? "yes" : "na",
+    drug_details: row["Formula ID"] ? `Formula ID ${row["Formula ID"]}` : "",
+    drug_recalled: "na",
+    issue,
+    failure: [],
+    complaint,
+    investigation: "",
+    resolution: "",
+    follow_up: "",
+    patient_notified: "na",
+    prescriber_notified: "na",
+    completed_by: "Historical CSV import",
+    status: "approved",
+    qre_category: qreCategory,
+    qre_items: [qreItem],
+    review_department: department,
+    pharmacist_name: row.Rph || "Historical import",
+    pharmacist_notes: "Imported from historical QI dashboard raw data.",
+    documentation_complete: "yes",
+    reviewed_by: state.user?.id || null,
+    reviewed_at: new Date().toISOString(),
+    submitted_by: state.user?.id || null
+  };
+}
+
+function parseHistoricalDate(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return "";
+  const [, month, day, year] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function normalizeComplaintSource(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "internal") return "Internal";
+  if (normalized === "external") return "External";
+  return "";
+}
+
+function mapHistoricalCategory(section, errorType) {
+  const sectionKey = normalizeLookup(section);
+  const errorKey = normalizeLookup(errorType);
+  if (["allergies", "dosing issue"].includes(errorKey)) return "clinical";
+  if (sectionKey === "patient complaints") return "complaints";
+  if (sectionKey === "facility") return "facility";
+  if (["internal", "lab", "receiving", "data entry"].includes(sectionKey)) return "internal";
+  return "internal";
+}
+
+function mapHistoricalQreItem(errorType, categoryKey) {
+  const key = normalizeLookup(errorType);
+  const map = {
+    allergies: "Allergy",
+    "dosing issue": "Dosing Issue",
+    environmental: "Environmental Monitoring Issue",
+    "formulation error": "Preparation Quality",
+    instructions: "Labeling Issue",
+    "labeling issue": "Labeling Issue",
+    "packaging issue": "Packaging Issue",
+    potency: "Potency Issue",
+    "potency issue": "Potency Issue",
+    "preparation quality": "Preparation Quality",
+    "receipt issue": "Receipt Issue",
+    "wrong drug": "Drug Errors",
+    "wrong ingredient amount": "Preparation Quality",
+    "wrong patient": "Drug Errors",
+    "wrong quantity": "Drug Errors"
+  };
+  const item = map[key] || (key ? `Other: ${errorType.trim()}` : "Other");
+  const allowedItems = QRE_CATEGORIES[categoryKey]?.items || [];
+  return allowedItems.some((allowed) => item === allowed || (allowed === "Other" && item.startsWith("Other: ")))
+    ? item
+    : `Other: ${errorType.trim() || "Historical import"}`;
+}
+
+function mapHistoricalIssue(section, errorType) {
+  const values = [];
+  if (normalizeLookup(section) === "data entry") values.push("Data Entry");
+
+  const key = normalizeLookup(errorType);
+  const map = {
+    address: "Other: Address",
+    environmental: "Environmental monitoring",
+    instructions: "Directions",
+    "labeling issue": "Labeling",
+    "packaging issue": "Packaging",
+    payment: "Other: Payment",
+    "potency issue": "Potency",
+    refills: "Other: Refills",
+    "wrong doctor": "Other: Wrong doctor",
+    "wrong drug": "Drug",
+    "wrong expiration": "Other: Wrong expiration",
+    "wrong ingredient amount": "Compounding process",
+    "wrong patient": "Patient",
+    "wrong quantity": "Quantity"
+  };
+  if (map[key]) values.push(map[key]);
+  if (!values.length && errorType) values.push(`Other: ${errorType.trim()}`);
+  return [...new Set(values)];
+}
+
+function mapHistoricalDepartment(section) {
+  const key = normalizeLookup(section);
+  if (key === "lab") return "Lab";
+  if (key === "data entry") return "Other: Data entry";
+  if (key === "facility") return "Other: Facility";
+  if (key === "patient complaints") return "Other: Patient Complaints";
+  if (key === "receiving") return "Other: Receiving";
+  if (key === "internal") return "Other: Internal";
+  return "Other: Historical import";
+}
+
+function normalizeLookup(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function hasHistoricalDuplicate(payload) {
+  const payloadKey = historicalRecordKey(payload);
+  return state.records.some((record) => historicalRecordKey(record) === payloadKey);
+}
+
+function historicalRecordKey(record) {
+  return [
+    record.event_date || "",
+    record.patient_identifier || "",
+    record.complaint || "",
+    record.qre_category || "",
+    listValue(record.qre_items || [])
+  ].join("|").toLowerCase();
 }
 
 function getThreeMonthRange(selectedMonth) {
