@@ -192,7 +192,12 @@
 
               <label class="wide">
                 Complainant(s)
-                <input name="complainants" type="text" />
+                <select name="complainants" required>
+                  <option value="">Select complainant</option>
+                  <option>Internal</option>
+                  <option>Patient/Delegate</option>
+                  <option>Doctor</option>
+                </select>
               </label>
 
               <fieldset>
@@ -399,6 +404,7 @@
                 </div>
                 <div id="approvedPreview" class="summary-box">Select an approved variance to review or print.</div>
                 <div class="form-actions">
+                  <button class="ghost-button hidden" id="returnToReviewButton" type="button">Return to pharmacist review</button>
                   <button class="ghost-button" id="printApprovedButton" type="button">Print selected variance</button>
                 </div>
               </div>

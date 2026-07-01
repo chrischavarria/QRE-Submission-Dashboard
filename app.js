@@ -115,6 +115,7 @@ const els = {
   approvedStatus: document.querySelector("#approvedStatus"),
   approvedPreview: document.querySelector("#approvedPreview"),
   printApprovedButton: document.querySelector("#printApprovedButton"),
+  returnToReviewButton: document.querySelector("#returnToReviewButton"),
   printReviewButton: document.querySelector("#printReviewButton"),
   editSubmissionButton: document.querySelector("#editSubmissionButton"),
   approveButton: document.querySelector("#approveButton"),
@@ -203,6 +204,7 @@ function bindEvents() {
     printRecord({ ...record, ...reviewFormToPrintable() }, "review");
   });
   els.printApprovedButton.addEventListener("click", () => printRecord(selectedApprovedRecord(), "approved"));
+  els.returnToReviewButton.addEventListener("click", returnApprovedToReview);
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
   document.addEventListener("change", onOtherControlChange);
   els.metricMonth.addEventListener("change", renderMetrics);
@@ -569,6 +571,28 @@ async function onReject() {
   render();
 }
 
+async function returnApprovedToReview() {
+  if (!requirePharmacist()) return;
+  const record = selectedApprovedRecord();
+  if (!record) return;
+
+  const label = `${record.reported_by || "approved variance"} from ${record.event_date || "unknown date"}`;
+  const confirmed = window.confirm(`Return ${label} to Pharmacist Review? Existing pharmacist entries will be kept.`);
+  if (!confirmed) return;
+
+  const saved = await persistUpdate(record.id, {
+    status: "pending",
+    review_department: record.review_department || record.department || ""
+  });
+  if (!saved) return;
+
+  state.selectedApprovedId = null;
+  state.selectedRecordId = record.id;
+  state.activeView = "review";
+  render();
+  showStatus("Approved variance returned to Pharmacist Review. Prior pharmacist entries were kept.", "success", { persist: true });
+}
+
 async function persistUpdate(id, update) {
   if (!state.supabase) {
     showStatus("The secure data service is unavailable.", "error");
@@ -863,6 +887,7 @@ function renderApprovedArchive() {
     button.addEventListener("click", () => {
       state.selectedApprovedId = button.dataset.id;
       renderApprovedArchive();
+      renderSelectedApproved();
     });
   });
 
@@ -889,6 +914,7 @@ function renderSelectedRecord() {
   els.printReviewButton.disabled = false;
   els.editSubmissionButton.disabled = !hasPharmacistAccess();
   els.editSubmissionButton.classList.toggle("hidden", !hasPharmacistAccess());
+  populateReviewForm(record);
   setApproveButtonState("idle");
   els.reviewSummary.innerHTML = `
     <div class="preview-header">
@@ -930,16 +956,30 @@ function renderSelectedApproved() {
     els.approvedStatus.textContent = "No record selected";
     els.approvedPreview.innerHTML = "Select an approved variance to review or print.";
     els.printApprovedButton.disabled = true;
+    els.returnToReviewButton.disabled = true;
+    els.returnToReviewButton.classList.toggle("hidden", !hasPharmacistAccess());
     return;
   }
 
   els.approvedStatus.textContent = "Approved variance";
   els.approvedPreview.innerHTML = printableRecordBody(record, { includeTitle: false });
   els.printApprovedButton.disabled = false;
+  els.returnToReviewButton.disabled = !hasPharmacistAccess();
+  els.returnToReviewButton.classList.toggle("hidden", !hasPharmacistAccess());
 }
 
 function previewItem(label, value) {
   return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "N/A")}</strong></div>`;
+}
+
+function populateReviewForm(record) {
+  const category = QRE_CATEGORIES[record.qre_category] ? record.qre_category : "clinical";
+  els.reviewForm.elements.qre_category.value = category;
+  renderQreItems(category);
+  setCheckboxValuesWithOther(els.reviewForm, "qre_items", record.qre_items || []);
+  els.reviewForm.elements.pharmacist_name.value = record.pharmacist_name || "";
+  els.reviewForm.elements.pharmacist_notes.value = record.pharmacist_notes || "";
+  setRadioValue(els.reviewForm, "documentation_complete", record.documentation_complete);
 }
 
 function listValue(value) {
