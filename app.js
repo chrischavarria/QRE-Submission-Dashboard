@@ -149,7 +149,7 @@ function hydrateStaticControls() {
     target.innerHTML = OPTIONS[key].map((option) => checkboxMarkup(key, option)).join("");
   });
 
-  document.querySelectorAll('select[name="department"], select[name="review_department"]').forEach((select) => {
+  document.querySelectorAll('select[name="department"]').forEach((select) => {
     select.innerHTML = DEPARTMENTS.map((department) => `<option>${department}</option>`).join("");
   });
 
@@ -528,7 +528,7 @@ async function onApprove(event) {
     status: "approved",
     qre_category: data.get("qre_category"),
     qre_items: valuesWithOther(data, "qre_items"),
-    review_department: valueWithOther(data, "review_department"),
+    review_department: record.department || "",
     pharmacist_name: data.get("pharmacist_name"),
     pharmacist_notes: data.get("pharmacist_notes"),
     documentation_complete: data.get("documentation_complete"),
@@ -821,15 +821,6 @@ function renderPending() {
   els.pendingList.querySelectorAll(".record-select").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedRecordId = button.dataset.id;
-      const record = selectedRecord();
-      if (record.department?.startsWith("Other: ")) {
-        els.reviewForm.elements.review_department.value = "Other";
-        els.reviewForm.elements.review_department_other.value = record.department.replace("Other: ", "");
-        syncOtherField("review_department", true);
-      } else {
-        els.reviewForm.elements.review_department.value = record.department || DEPARTMENTS[0];
-        syncOtherField("review_department", false);
-      }
       renderSelectedRecord();
       renderPending();
     });
@@ -977,7 +968,6 @@ function reviewFormToPrintable() {
   return {
     qre_category: data.get("qre_category"),
     qre_items: valuesWithOther(data, "qre_items"),
-    review_department: valueWithOther(data, "review_department"),
     pharmacist_name: data.get("pharmacist_name"),
     pharmacist_notes: data.get("pharmacist_notes"),
     documentation_complete: data.get("documentation_complete")
@@ -1050,7 +1040,7 @@ function printableRecordBody(record, options = {}) {
       <div class="print-grid">
         ${printItem("QRE category", category)}
         ${printItem("QRE metric item(s)", listValue(record.qre_items))}
-        ${printItem("Notification department", record.review_department)}
+        ${printItem("Department", record.review_department || record.department)}
         ${printItem("Approved by pharmacist", record.pharmacist_name)}
         ${printItem("Documentation complete", record.documentation_complete)}
         ${printItem("Reviewed at", formatDateTime(record.reviewed_at))}
@@ -1115,7 +1105,7 @@ function valueWithOther(data, name) {
 }
 
 function syncAllOtherFields() {
-  ["department", "nature", "source", "issue", "failure", "origin_of_complaint", "qre_items", "review_department"].forEach((name) => {
+  ["department", "nature", "source", "issue", "failure", "origin_of_complaint", "qre_items"].forEach((name) => {
     syncOtherField(name, false);
   });
 }
