@@ -786,6 +786,19 @@ textarea {
   border-bottom: 1px solid var(--line);
 }
 
+.preview-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.preview-header span {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .preview-header strong {
   display: block;
   color: var(--ink);
@@ -793,7 +806,7 @@ textarea {
   font-weight: 700;
 }
 
-.preview-header span {
+.preview-header time {
   color: var(--muted);
   font-size: 12.5px;
 }

@@ -901,8 +901,11 @@ function renderSelectedRecord() {
   setApproveButtonState("idle");
   els.reviewSummary.innerHTML = `
     <div class="preview-header">
-      <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
-      <span>${escapeHtml(record.event_date || "")} ${escapeHtml(record.event_time || "")}</span>
+      <div>
+        <span>Issue / Complaint</span>
+        <strong>${escapeHtml(record.complaint || "No complaint text")}</strong>
+      </div>
+      <time>${escapeHtml(record.event_date || "")} ${escapeHtml(record.event_time || "")}</time>
     </div>
     <div class="preview-grid">
       ${previewItem("Reported by", record.reported_by)}
