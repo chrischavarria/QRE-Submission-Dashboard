@@ -1285,9 +1285,8 @@ async function onImportHistoricalCsv(event) {
   }
 
   try {
-    showStatus("Reading historical CSV...", "info", { persist: true });
-    const text = await readFileAsText(file);
-    const rows = parseCsv(text);
+    showStatus("Reading historical file...", "info", { persist: true });
+    const rows = await readHistoricalRows(file);
     const payloads = rows
       .map(mapHistoricalCsvRow)
       .filter(Boolean)
@@ -1298,9 +1297,9 @@ async function onImportHistoricalCsv(event) {
       return;
     }
 
-    const confirmed = window.confirm(`Import ${payloads.length} approved historical QRE record(s)? Slack notifications will not be sent.`);
+    const confirmed = window.confirm(`Import ${payloads.length} approved historical QRE record(s) from ${file.name}? Slack notifications will not be sent.`);
     if (!confirmed) {
-      showStatus("Historical CSV import cancelled.", "info");
+      showStatus("Historical import cancelled.", "info");
       return;
     }
 
@@ -1319,10 +1318,20 @@ async function onImportHistoricalCsv(event) {
     showStatus(`Imported ${payloads.length} approved historical QRE record(s). Metrics have been refreshed.`, "success", { persist: true });
   } catch (error) {
     console.error(error);
-    showStatus(`Historical CSV import failed: ${error.message}`, "error", { persist: true });
+    showStatus(`Historical import failed: ${error.message}`, "error", { persist: true });
   } finally {
     els.importHistoricalButton.disabled = false;
   }
+}
+
+async function readHistoricalRows(file) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (extension === "xlsx" || extension === "xls") {
+    return readExcelRows(file);
+  }
+
+  const text = await readFileAsText(file);
+  return parseCsv(text);
 }
 
 function readFileAsText(file) {
@@ -1332,6 +1341,38 @@ function readFileAsText(file) {
     reader.addEventListener("error", () => reject(reader.error || new Error("Unable to read file.")));
     reader.readAsText(file, "windows-1252");
   });
+}
+
+async function readExcelRows(file) {
+  const XLSX = await loadXlsxLibrary();
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+
+  return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
+    defval: "",
+    raw: false,
+    dateNF: "m/d/yyyy"
+  }).map((row) => normalizeHistoricalRow(row));
+}
+
+async function loadXlsxLibrary() {
+  if (window.XLSX) return window.XLSX;
+  try {
+    const module = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
+    window.XLSX = module.default || module;
+    return window.XLSX;
+  } catch (error) {
+    throw new Error("Excel import library could not load. Please check your internet connection or upload a CSV instead.");
+  }
+}
+
+function normalizeHistoricalRow(row) {
+  return Object.entries(row).reduce((normalized, [key, value]) => {
+    normalized[String(key).trim()] = String(value ?? "").trim();
+    return normalized;
+  }, {});
 }
 
 function parseCsv(text) {
