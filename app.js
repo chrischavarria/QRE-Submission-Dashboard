@@ -1370,7 +1370,9 @@ async function loadXlsxLibrary() {
 
 function normalizeHistoricalRow(row) {
   return Object.entries(row).reduce((normalized, [key, value]) => {
-    normalized[String(key).trim()] = String(value ?? "").trim();
+    normalized[String(key).trim()] = value instanceof Date
+      ? value.toISOString().slice(0, 10)
+      : String(value ?? "").trim();
     return normalized;
   }, {});
 }
@@ -1471,10 +1473,25 @@ function mapHistoricalCsvRow(row) {
 }
 
 function parseHistoricalDate(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return "";
-  const [, month, day, year] = match;
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = String(value || "").trim();
+  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, yearValue] = slashMatch;
+    const year = yearValue.length === 2 ? `20${yearValue}` : yearValue;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+\d{1,2}:\d{2}:\d{2})?$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  return "";
 }
 
 function normalizeComplaintSource(value) {
