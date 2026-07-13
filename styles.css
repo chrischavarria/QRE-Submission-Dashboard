@@ -878,6 +878,22 @@ textarea {
   flex-wrap: wrap;
 }
 
+.metrics-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metrics-filters label {
+  min-width: 0;
+}
+
+.metrics-filters select,
+.metrics-filters input {
+  width: 100%;
+}
+
 .metrics-subheading {
   margin-top: 26px;
   margin-bottom: 14px;
@@ -1144,6 +1160,10 @@ td {
   .metric-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .metrics-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 680px) {
@@ -1158,6 +1178,7 @@ td {
   }
 
   .form-grid,
+  .metrics-filters,
   .metric-cards,
   .preview-grid {
     grid-template-columns: 1fr;

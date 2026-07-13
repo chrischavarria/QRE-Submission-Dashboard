@@ -85,7 +85,7 @@ with check (submitted_by = auth.uid());
 
 create policy "Submitters can read own reports"
 on public.variance_reports for select
-using (submitted_by = auth.uid() or public.current_user_role() in ('pharmacist', 'admin'));
+using (status = 'approved' or submitted_by = auth.uid() or public.current_user_role() in ('pharmacist', 'admin'));
 
 create policy "Pharmacists can update reports"
 on public.variance_reports for update

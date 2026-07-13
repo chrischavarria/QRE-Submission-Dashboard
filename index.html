@@ -348,8 +348,51 @@
               <div class="metrics-actions">
                 <input class="hidden" id="historicalCsvInput" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
                 <button class="ghost-button hidden" id="importHistoricalButton" type="button">Import historical file</button>
+                <button class="ghost-button" id="clearMetricFiltersButton" type="button">Clear filters</button>
                 <button class="ghost-button" id="exportButton" type="button">Export CSV</button>
               </div>
+            </div>
+            <div class="metrics-filters">
+              <label>
+                Start date
+                <input id="metricStartDate" type="date" />
+              </label>
+              <label>
+                End date
+                <input id="metricEndDate" type="date" />
+              </label>
+              <label>
+                Department
+                <select id="metricDepartmentFilter"></select>
+              </label>
+              <label>
+                Patient involved
+                <select id="metricPatientFilter"></select>
+              </label>
+              <label>
+                Staff involved
+                <select id="metricStaffFilter"></select>
+              </label>
+              <label>
+                Nature of variance
+                <select id="metricNatureFilter"></select>
+              </label>
+              <label>
+                Source of complaint
+                <select id="metricComplaintSourceFilter"></select>
+              </label>
+              <label>
+                Origin of complaint
+                <select id="metricOriginFilter"></select>
+              </label>
+              <label>
+                Complainant(s)
+                <select id="metricComplainantFilter"></select>
+              </label>
+              <label>
+                Incorrect / issue with
+                <select id="metricIssueFilter"></select>
+              </label>
             </div>
             <div id="metricCards" class="metric-cards"></div>
             <div class="report-table-wrap">

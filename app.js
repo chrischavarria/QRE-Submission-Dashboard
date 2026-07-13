@@ -4,6 +4,7 @@ const SLACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHHXGrpl
 const SLACK_APPS_SCRIPT_TOKEN = "qre-dashboard";
 
 const DEPARTMENTS = ["Front", "Lab", "Contract Fulfillment", "Front Fulfillment", "RPh", "Other"];
+const COMPLAINANTS = ["Internal", "Patient/Delegate", "Doctor"];
 const US_STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
   "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -122,6 +123,16 @@ const els = {
   printReport: document.querySelector("#printReport"),
   qreItems: document.querySelector("#qreItems"),
   metricMonth: document.querySelector("#metricMonth"),
+  metricStartDate: document.querySelector("#metricStartDate"),
+  metricEndDate: document.querySelector("#metricEndDate"),
+  metricDepartmentFilter: document.querySelector("#metricDepartmentFilter"),
+  metricPatientFilter: document.querySelector("#metricPatientFilter"),
+  metricStaffFilter: document.querySelector("#metricStaffFilter"),
+  metricNatureFilter: document.querySelector("#metricNatureFilter"),
+  metricComplaintSourceFilter: document.querySelector("#metricComplaintSourceFilter"),
+  metricOriginFilter: document.querySelector("#metricOriginFilter"),
+  metricComplainantFilter: document.querySelector("#metricComplainantFilter"),
+  metricIssueFilter: document.querySelector("#metricIssueFilter"),
   metricCards: document.querySelector("#metricCards"),
   metricTableBody: document.querySelector("#metricTable tbody"),
   trendTableBody: document.querySelector("#trendTable tbody"),
@@ -130,7 +141,8 @@ const els = {
   trendMonthTwo: document.querySelector("#trendMonthTwo"),
   trendMonthThree: document.querySelector("#trendMonthThree"),
   historicalCsvInput: document.querySelector("#historicalCsvInput"),
-  importHistoricalButton: document.querySelector("#importHistoricalButton")
+  importHistoricalButton: document.querySelector("#importHistoricalButton"),
+  clearMetricFiltersButton: document.querySelector("#clearMetricFiltersButton")
 };
 
 init();
@@ -154,6 +166,13 @@ function hydrateStaticControls() {
     select.innerHTML = DEPARTMENTS.map((department) => `<option>${department}</option>`).join("");
   });
 
+  document.querySelector('select[name="complainants"]').innerHTML = [
+    `<option value="">Select complainant</option>`,
+    ...COMPLAINANTS.map((complainant) => `<option>${complainant}</option>`)
+  ].join("");
+
+  hydrateMetricFilters();
+
   els.varianceForm.elements.shipped_to_state.innerHTML = [
     `<option value="">Select state</option>`,
     ...US_STATES.map((stateCode) => `<option>${stateCode}</option>`)
@@ -164,6 +183,25 @@ function hydrateStaticControls() {
     .map(([key, value]) => `<option value="${key}">${value.label}</option>`)
     .join("");
   renderQreItems("clinical");
+}
+
+function hydrateMetricFilters() {
+  setFilterOptions(els.metricDepartmentFilter, DEPARTMENTS);
+  setFilterOptions(els.metricPatientFilter, ["yes", "no", "na"], { labels: { yes: "Yes", no: "No", na: "N/A" } });
+  setFilterOptions(els.metricStaffFilter, ["yes", "no", "na"], { labels: { yes: "Yes", no: "No", na: "N/A" } });
+  setFilterOptions(els.metricNatureFilter, OPTIONS.nature);
+  setFilterOptions(els.metricComplaintSourceFilter, ["Internal", "External"]);
+  setFilterOptions(els.metricOriginFilter, ["In-person", "Phone", "Email", "Mail", "Other"]);
+  setFilterOptions(els.metricComplainantFilter, COMPLAINANTS);
+  setFilterOptions(els.metricIssueFilter, OPTIONS.issue);
+}
+
+function setFilterOptions(select, options, config = {}) {
+  const labels = config.labels || {};
+  select.innerHTML = [
+    `<option value="">All</option>`,
+    ...options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(labels[option] || option)}</option>`)
+  ].join("");
 }
 
 function checkboxMarkup(name, value) {
@@ -207,7 +245,8 @@ function bindEvents() {
   els.returnToReviewButton.addEventListener("click", returnApprovedToReview);
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
   document.addEventListener("change", onOtherControlChange);
-  els.metricMonth.addEventListener("change", renderMetrics);
+  metricFilterElements().forEach((input) => input.addEventListener("change", renderMetrics));
+  els.clearMetricFiltersButton.addEventListener("click", clearMetricFilters);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
   els.importHistoricalButton.addEventListener("click", () => els.historicalCsvInput.click());
   els.historicalCsvInput.addEventListener("change", onImportHistoricalCsv);
@@ -215,6 +254,22 @@ function bindEvents() {
     document.body.classList.remove("printing-record");
     els.printReport.innerHTML = "";
   });
+}
+
+function metricFilterElements() {
+  return [
+    els.metricMonth,
+    els.metricStartDate,
+    els.metricEndDate,
+    els.metricDepartmentFilter,
+    els.metricPatientFilter,
+    els.metricStaffFilter,
+    els.metricNatureFilter,
+    els.metricComplaintSourceFilter,
+    els.metricOriginFilter,
+    els.metricComplainantFilter,
+    els.metricIssueFilter
+  ];
 }
 
 function setDefaultDates() {
@@ -1152,11 +1207,9 @@ function syncAllOtherFields() {
 
 function renderMetrics() {
   if (!state.user) return;
-  const month = els.metricMonth.value;
-  const trendMonths = getThreeMonthRange(month);
-  const approved = state.records.filter((record) => {
-    return record.status === "approved" && (!month || (record.event_date || "").startsWith(month));
-  });
+  const filters = getMetricFilters();
+  const trendMonths = getThreeMonthRange(filters.month || monthFromDate(filters.endDate));
+  const approved = state.records.filter((record) => recordMatchesMetricFilters(record, filters));
 
   const rows = [];
   ["Internal", "External"].forEach((source) => {
@@ -1201,7 +1254,7 @@ function renderMetrics() {
     </tr>`)
     .join("");
 
-  renderTrendTable(trendMonths);
+  renderTrendTable(trendMonths, filters);
 }
 
 function includesMetricItem(values, item) {
@@ -1214,8 +1267,8 @@ function documentationRate(records) {
   return `${complete}/${records.length} complete`;
 }
 
-function renderTrendTable(months) {
-  const approved = state.records.filter((record) => record.status === "approved");
+function renderTrendTable(months, filters = getMetricFilters()) {
+  const approved = state.records.filter((record) => record.status === "approved" && recordMatchesNonDateMetricFilters(record, filters));
   els.trendMonthOne.textContent = formatMonthLabel(months[0]);
   els.trendMonthTwo.textContent = formatMonthLabel(months[1]);
   els.trendMonthThree.textContent = formatMonthLabel(months[2]);
@@ -1271,6 +1324,58 @@ function renderTrendTable(months) {
         <td>${escapeHtml(row.trend)}</td>
       </tr>`).join("")
     : `<tr><td colspan="6">No approved QRE metrics in this 3-month range.</td></tr>`;
+}
+
+function getMetricFilters() {
+  return {
+    month: els.metricMonth.value,
+    startDate: els.metricStartDate.value,
+    endDate: els.metricEndDate.value,
+    department: els.metricDepartmentFilter.value,
+    patientInvolved: els.metricPatientFilter.value,
+    staffInvolved: els.metricStaffFilter.value,
+    nature: els.metricNatureFilter.value,
+    complaintSource: els.metricComplaintSourceFilter.value,
+    origin: els.metricOriginFilter.value,
+    complainant: els.metricComplainantFilter.value,
+    issue: els.metricIssueFilter.value
+  };
+}
+
+function recordMatchesMetricFilters(record, filters) {
+  if (record.status !== "approved") return false;
+  if (filters.month && !(record.event_date || "").startsWith(filters.month)) return false;
+  if (filters.startDate && (record.event_date || "") < filters.startDate) return false;
+  if (filters.endDate && (record.event_date || "") > filters.endDate) return false;
+  return recordMatchesNonDateMetricFilters(record, filters);
+}
+
+function recordMatchesNonDateMetricFilters(record, filters) {
+  if (filters.department && !filterValueMatches(record.department, filters.department)) return false;
+  if (filters.patientInvolved && record.patient_involved !== filters.patientInvolved) return false;
+  if (filters.staffInvolved && record.staff_involved !== filters.staffInvolved) return false;
+  if (filters.nature && !arrayFilterMatches(record.nature, filters.nature)) return false;
+  if (filters.complaintSource && recordComplaintSource(record) !== filters.complaintSource) return false;
+  if (filters.origin && !filterValueMatches(record.origin_of_complaint, filters.origin)) return false;
+  if (filters.complainant && record.complainants !== filters.complainant) return false;
+  if (filters.issue && !arrayFilterMatches(record.issue, filters.issue)) return false;
+  return true;
+}
+
+function filterValueMatches(value, filter) {
+  if (value === filter) return true;
+  return typeof value === "string" && filter === "Other" && value.startsWith("Other: ");
+}
+
+function arrayFilterMatches(values, filter) {
+  return Array.isArray(values) && values.some((value) => filterValueMatches(value, filter));
+}
+
+function clearMetricFilters() {
+  metricFilterElements().forEach((input) => {
+    input.value = "";
+  });
+  renderMetrics();
 }
 
 async function onImportHistoricalCsv(event) {
@@ -1607,6 +1712,10 @@ function monthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function monthFromDate(dateValue) {
+  return dateValue ? dateValue.slice(0, 7) : "";
+}
+
 function formatMonthLabel(month) {
   const date = new Date(`${month}-01T00:00:00`);
   return date.toLocaleString(undefined, { month: "short", year: "numeric" });
@@ -1623,8 +1732,10 @@ function trendLabel(counts) {
 }
 
 function exportMetricsCsv() {
+  const filters = getMetricFilters();
   const rows = [
     ["Monthly Metrics"],
+    ["Filters", metricFilterSummary(filters)],
     ["Category", "Metric", "Count", "Documentation", "Trend status"]
   ];
   els.metricTableBody.querySelectorAll("tr").forEach((tr) => {
@@ -1648,9 +1759,28 @@ function exportMetricsCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `qre-metrics-${els.metricMonth.value || "all"}.csv`;
+  link.download = `qre-metrics-${filters.month || filters.startDate || "all"}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function metricFilterSummary(filters) {
+  return Object.entries({
+    month: filters.month,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    department: filters.department,
+    patientInvolved: filters.patientInvolved,
+    staffInvolved: filters.staffInvolved,
+    nature: filters.nature,
+    complaintSource: filters.complaintSource,
+    origin: filters.origin,
+    complainant: filters.complainant,
+    issue: filters.issue
+  })
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("; ") || "All approved QREs";
 }
 
 function escapeHtml(value) {
