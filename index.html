@@ -353,6 +353,10 @@
               </div>
             </div>
             <div class="metrics-filters">
+              <label class="wide-filter">
+                Search archive
+                <input id="metricSearchFilter" type="search" placeholder="Name, RX, formula, issue, notes..." />
+              </label>
               <label>
                 Start date
                 <input id="metricStartDate" type="date" />
@@ -408,6 +412,19 @@
                 </thead>
                 <tbody></tbody>
               </table>
+            </div>
+            <div class="section-heading metrics-subheading">
+              <h3>Matching Variances</h3>
+              <span class="status-pill" id="metricResultCount">0 variances</span>
+            </div>
+            <div class="metric-results-layout">
+              <div id="metricResultList" class="record-list metric-record-list"></div>
+              <div class="metric-preview-panel">
+                <div id="metricRecordPreview" class="summary-box">Click a metric row or variance to preview matching approved variances.</div>
+                <div class="form-actions">
+                  <button class="ghost-button" id="printMetricRecordButton" type="button" disabled>Print selected variance</button>
+                </div>
+              </div>
             </div>
             <div class="section-heading metrics-subheading">
               <h3>3-Month Trends</h3>

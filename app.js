@@ -88,6 +88,9 @@ const state = {
   records: [],
   selectedRecordId: null,
   selectedApprovedId: null,
+  selectedMetricRecordId: null,
+  metricDrilldownRecords: [],
+  metricDrilldownLabel: "",
   editingRecordId: null,
   activeView: "intake",
   isSubmittingVariance: false
@@ -123,6 +126,7 @@ const els = {
   printReport: document.querySelector("#printReport"),
   qreItems: document.querySelector("#qreItems"),
   metricMonth: document.querySelector("#metricMonth"),
+  metricSearchFilter: document.querySelector("#metricSearchFilter"),
   metricStartDate: document.querySelector("#metricStartDate"),
   metricEndDate: document.querySelector("#metricEndDate"),
   metricDepartmentFilter: document.querySelector("#metricDepartmentFilter"),
@@ -135,6 +139,10 @@ const els = {
   metricIssueFilter: document.querySelector("#metricIssueFilter"),
   metricCards: document.querySelector("#metricCards"),
   metricTableBody: document.querySelector("#metricTable tbody"),
+  metricResultCount: document.querySelector("#metricResultCount"),
+  metricResultList: document.querySelector("#metricResultList"),
+  metricRecordPreview: document.querySelector("#metricRecordPreview"),
+  printMetricRecordButton: document.querySelector("#printMetricRecordButton"),
   trendTableBody: document.querySelector("#trendTable tbody"),
   trendRange: document.querySelector("#trendRange"),
   trendMonthOne: document.querySelector("#trendMonthOne"),
@@ -242,10 +250,12 @@ function bindEvents() {
     printRecord({ ...record, ...reviewFormToPrintable() }, "review");
   });
   els.printApprovedButton.addEventListener("click", () => printRecord(selectedApprovedRecord(), "approved"));
+  els.printMetricRecordButton.addEventListener("click", () => printRecord(selectedMetricRecord(), "approved"));
   els.returnToReviewButton.addEventListener("click", returnApprovedToReview);
   els.reviewForm.elements.qre_category.addEventListener("change", (event) => renderQreItems(event.target.value));
   document.addEventListener("change", onOtherControlChange);
   metricFilterElements().forEach((input) => input.addEventListener("change", renderMetrics));
+  els.metricSearchFilter.addEventListener("input", renderMetrics);
   els.clearMetricFiltersButton.addEventListener("click", clearMetricFilters);
   document.querySelector("#exportButton").addEventListener("click", exportMetricsCsv);
   els.importHistoricalButton.addEventListener("click", () => els.historicalCsvInput.click());
@@ -259,6 +269,7 @@ function bindEvents() {
 function metricFilterElements() {
   return [
     els.metricMonth,
+    els.metricSearchFilter,
     els.metricStartDate,
     els.metricEndDate,
     els.metricDepartmentFilter,
@@ -1215,6 +1226,8 @@ function renderMetrics() {
   ["Internal", "External"].forEach((source) => {
     const matching = approved.filter((record) => recordComplaintSource(record) === source);
     rows.push({
+      kind: "source",
+      source,
       category: "Complaint Source",
       item: source,
       count: matching.length,
@@ -1227,6 +1240,8 @@ function renderMetrics() {
     category.items.forEach((item) => {
       const matching = approved.filter((record) => record.qre_category === key && includesMetricItem(record.qre_items || [], item));
       rows.push({
+        kind: "qre",
+        categoryKey: key,
         category: category.label,
         item,
         count: matching.length,
@@ -1245,7 +1260,7 @@ function renderMetrics() {
   `;
 
   els.metricTableBody.innerHTML = rows
-    .map((row) => `<tr>
+    .map((row) => `<tr class="metric-drill-row" data-kind="${escapeHtml(row.kind)}" data-category="${escapeHtml(row.categoryKey || "")}" data-item="${escapeHtml(row.item)}" data-source="${escapeHtml(row.source || "")}" tabindex="0">
       <td>${escapeHtml(row.category)}</td>
       <td>${escapeHtml(row.item)}</td>
       <td>${row.count}</td>
@@ -1255,6 +1270,7 @@ function renderMetrics() {
     .join("");
 
   renderTrendTable(trendMonths, filters);
+  renderMetricDrilldown(approved, "Filtered approved variances");
 }
 
 function includesMetricItem(values, item) {
@@ -1285,6 +1301,8 @@ function renderTrendTable(months, filters = getMetricFilters()) {
 
     if (counts.some((count) => count > 0)) {
       rows.push({
+        kind: "source",
+        source,
         category: "Complaint Source",
         item: source,
         counts,
@@ -1305,6 +1323,8 @@ function renderTrendTable(months, filters = getMetricFilters()) {
 
       if (counts.some((count) => count > 0)) {
         rows.push({
+          kind: "qre",
+          categoryKey: key,
           category: category.label,
           item,
           counts,
@@ -1315,7 +1335,7 @@ function renderTrendTable(months, filters = getMetricFilters()) {
   });
 
   els.trendTableBody.innerHTML = rows.length
-    ? rows.map((row) => `<tr>
+    ? rows.map((row) => `<tr class="metric-drill-row" data-kind="${escapeHtml(row.kind)}" data-category="${escapeHtml(row.categoryKey || "")}" data-item="${escapeHtml(row.item)}" data-source="${escapeHtml(row.source || "")}" data-trend-months="${escapeHtml(months.join(","))}" tabindex="0">
         <td>${escapeHtml(row.category)}</td>
         <td>${escapeHtml(row.item)}</td>
         <td>${row.counts[0]}</td>
@@ -1324,11 +1344,59 @@ function renderTrendTable(months, filters = getMetricFilters()) {
         <td>${escapeHtml(row.trend)}</td>
       </tr>`).join("")
     : `<tr><td colspan="6">No approved QRE metrics in this 3-month range.</td></tr>`;
+  bindMetricRows(filters);
+}
+
+function bindMetricRows(filters) {
+  document.querySelectorAll(".metric-drill-row").forEach((row) => {
+    const showRecords = () => {
+      const records = recordsForMetricRow(row.dataset, filters);
+      const label = metricRowLabel(row.dataset, row.children);
+      renderMetricDrilldown(records, label);
+    };
+    row.addEventListener("click", showRecords);
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        showRecords();
+      }
+    });
+  });
+}
+
+function recordsForMetricRow(dataset, filters) {
+  const months = dataset.trendMonths ? dataset.trendMonths.split(",") : null;
+  return state.records.filter((record) => {
+    const matchesDate = months
+      ? months.some((month) => (record.event_date || "").startsWith(month))
+      : recordMatchesMetricFilters(record, filters);
+    return matchesDate &&
+      record.status === "approved" &&
+      recordMatchesNonDateMetricFilters(record, filters) &&
+      recordMatchesMetricDimension(record, dataset);
+  });
+}
+
+function recordMatchesMetricDimension(record, dataset) {
+  if (dataset.kind === "source") return recordComplaintSource(record) === dataset.source;
+  if (dataset.kind === "qre") {
+    return record.qre_category === dataset.category &&
+      includesMetricItem(record.qre_items || [], dataset.item);
+  }
+  return true;
+}
+
+function metricRowLabel(dataset, cells) {
+  const category = cells?.[0]?.textContent || "Metric";
+  const item = cells?.[1]?.textContent || "";
+  const range = dataset.trendMonths ? `, ${dataset.trendMonths.replaceAll(",", " - ")}` : "";
+  return `${category}: ${item}${range}`;
 }
 
 function getMetricFilters() {
   return {
     month: els.metricMonth.value,
+    search: els.metricSearchFilter.value.trim(),
     startDate: els.metricStartDate.value,
     endDate: els.metricEndDate.value,
     department: els.metricDepartmentFilter.value,
@@ -1359,7 +1427,39 @@ function recordMatchesNonDateMetricFilters(record, filters) {
   if (filters.origin && !filterValueMatches(record.origin_of_complaint, filters.origin)) return false;
   if (filters.complainant && record.complainants !== filters.complainant) return false;
   if (filters.issue && !arrayFilterMatches(record.issue, filters.issue)) return false;
+  if (filters.search && !recordMatchesSearch(record, filters.search)) return false;
   return true;
+}
+
+function recordMatchesSearch(record, search) {
+  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = [
+    record.reported_by,
+    record.department,
+    record.patient_identifier,
+    record.staff_names,
+    record.complainants,
+    record.drug_details,
+    record.complaint,
+    record.investigation,
+    record.resolution,
+    record.follow_up,
+    record.completed_by,
+    record.pharmacist_name,
+    record.pharmacist_notes,
+    record.shipped_to_state,
+    record.origin_of_complaint,
+    record.review_department,
+    record.documentation_complete,
+    listValue(record.nature),
+    listValue(record.issue),
+    listValue(record.failure),
+    listValue(record.qre_items),
+    recordComplaintSource(record),
+    QRE_CATEGORIES[record.qre_category]?.label
+  ].join(" ").toLowerCase();
+  return terms.every((term) => haystack.includes(term));
 }
 
 function filterValueMatches(value, filter) {
@@ -1376,6 +1476,55 @@ function clearMetricFilters() {
     input.value = "";
   });
   renderMetrics();
+}
+
+function renderMetricDrilldown(records, label) {
+  state.metricDrilldownRecords = [...records].sort((a, b) => String(b.event_date || "").localeCompare(String(a.event_date || "")));
+  state.metricDrilldownLabel = label;
+  if (!state.metricDrilldownRecords.some((record) => record.id === state.selectedMetricRecordId)) {
+    state.selectedMetricRecordId = state.metricDrilldownRecords[0]?.id || null;
+  }
+
+  els.metricResultCount.textContent = `${state.metricDrilldownRecords.length} variance${state.metricDrilldownRecords.length === 1 ? "" : "s"}`;
+  els.metricResultList.innerHTML = state.metricDrilldownRecords.length
+    ? state.metricDrilldownRecords.map((record) => metricRecordCard(record)).join("")
+    : `<div class="summary-box">No approved variances match ${escapeHtml(label)}.</div>`;
+
+  els.metricResultList.querySelectorAll(".metric-record-select").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedMetricRecordId = button.dataset.id;
+      renderMetricDrilldown(state.metricDrilldownRecords, state.metricDrilldownLabel);
+    });
+  });
+
+  renderSelectedMetricRecord();
+}
+
+function metricRecordCard(record) {
+  const active = record.id === state.selectedMetricRecordId ? " active" : "";
+  const category = QRE_CATEGORIES[record.qre_category]?.label || "Approved variance";
+  return `<div class="record-card${active}">
+    <button class="record-select metric-record-select" data-id="${record.id}" type="button">
+      <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
+      <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.department || "")}</span>
+      <span>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
+    </button>
+  </div>`;
+}
+
+function selectedMetricRecord() {
+  return state.metricDrilldownRecords.find((record) => record.id === state.selectedMetricRecordId);
+}
+
+function renderSelectedMetricRecord() {
+  const record = selectedMetricRecord();
+  if (!record) {
+    els.metricRecordPreview.innerHTML = "Click a metric row or variance to preview matching approved variances.";
+    els.printMetricRecordButton.disabled = true;
+    return;
+  }
+  els.metricRecordPreview.innerHTML = printableRecordBody(record, { includeTitle: false });
+  els.printMetricRecordButton.disabled = false;
 }
 
 async function onImportHistoricalCsv(event) {
@@ -1767,6 +1916,7 @@ function exportMetricsCsv() {
 function metricFilterSummary(filters) {
   return Object.entries({
     month: filters.month,
+    search: filters.search,
     startDate: filters.startDate,
     endDate: filters.endDate,
     department: filters.department,
