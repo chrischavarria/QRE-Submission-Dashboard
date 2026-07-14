@@ -1674,35 +1674,61 @@ function parseCsv(text) {
   });
 }
 
+function rowValue(row, ...names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(row, name)) return String(row[name] ?? "").trim();
+  }
+
+  const normalizedNames = names.map(normalizeHeader);
+  const matchingKey = Object.keys(row).find((key) => normalizedNames.includes(normalizeHeader(key)));
+  return matchingKey ? String(row[matchingKey] ?? "").trim() : "";
+}
+
+function normalizeHeader(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cleanImportIdentifier(value) {
+  const text = String(value || "").trim();
+  return text.endsWith(".0") ? text.slice(0, -2) : text;
+}
+
 function mapHistoricalCsvRow(row) {
-  const eventDate = parseHistoricalDate(row.Date);
-  const complaint = row.Notes?.trim();
-  const qreCategory = mapHistoricalCategory(row.Section, row["Error Type"]);
-  const qreItem = mapHistoricalQreItem(row["Error Type"], qreCategory);
+  const eventDate = parseHistoricalDate(rowValue(row, "Date"));
+  const complaint = rowValue(row, "Notes").trim();
+  const section = rowValue(row, "Section");
+  const errorType = rowValue(row, "Error Type");
+  const rxNumber = cleanImportIdentifier(rowValue(row, "RX #", "Rx Number", "RX Number", "Rx #"));
+  const formulaId = cleanImportIdentifier(rowValue(row, "Formula ID", "Formula"));
+  const employee = rowValue(row, "Employee");
+  const rph = rowValue(row, "Rph", "RPh", "Pharmacist");
+  const shipToState = rowValue(row, "Ship to State", "Ship to state", "Shipped to State");
+  const qreCategory = mapHistoricalCategory(section, errorType);
+  const qreItem = mapHistoricalQreItem(errorType, qreCategory);
 
   if (!eventDate || !complaint || !qreCategory || !qreItem) return null;
 
-  const complaintSource = normalizeComplaintSource(row["Internal vs External"]);
-  const department = mapHistoricalDepartment(row.Section);
-  const issue = mapHistoricalIssue(row.Section, row["Error Type"]);
-  const identifierParts = [row["RX #"], row["Formula ID"]].filter(Boolean);
+  const complaintSource = normalizeComplaintSource(rowValue(row, "Internal vs External")) || defaultHistoricalComplaintSource(section);
+  const department = mapHistoricalDepartment(section);
+  const issue = mapHistoricalIssue(section, errorType);
+  const identifierParts = [rxNumber, formulaId].filter(Boolean);
 
   return {
     event_date: eventDate,
-    reported_by: row.Employee || "Historical import",
+    reported_by: employee || "Historical import",
     department,
-    patient_involved: row["RX #"] ? "yes" : "na",
+    patient_involved: rxNumber ? "yes" : "na",
     patient_identifier: identifierParts.join(" / "),
-    staff_involved: row.Employee ? "yes" : "na",
-    staff_names: row.Employee || "",
+    staff_involved: employee ? "yes" : "na",
+    staff_names: employee || "",
     nature: ["Error"],
     source: complaintSource ? [complaintSource] : [],
     complaint_source: complaintSource,
-    shipped_to_state: complaintSource === "External" ? row["Ship to State"] : "",
+    shipped_to_state: complaintSource === "External" ? shipToState : "",
     origin_of_complaint: "",
     complainants: "",
-    drug_involved: row["Formula ID"] || row["RX #"] ? "yes" : "na",
-    drug_details: row["Formula ID"] ? `Formula ID ${row["Formula ID"]}` : "",
+    drug_involved: formulaId || rxNumber ? "yes" : "na",
+    drug_details: formulaId ? `Formula ID ${formulaId}` : "",
     drug_recalled: "na",
     issue,
     failure: [],
@@ -1717,7 +1743,7 @@ function mapHistoricalCsvRow(row) {
     qre_category: qreCategory,
     qre_items: [qreItem],
     review_department: department,
-    pharmacist_name: row.Rph || "Historical import",
+    pharmacist_name: rph || "Historical import",
     pharmacist_notes: "Imported from historical QI dashboard raw data.",
     documentation_complete: "yes",
     reviewed_by: state.user?.id || null,
@@ -1755,6 +1781,11 @@ function normalizeComplaintSource(value) {
   return "";
 }
 
+function defaultHistoricalComplaintSource(section) {
+  const sectionKey = normalizeLookup(section);
+  return sectionKey === "data entry" ? "Internal" : "";
+}
+
 function mapHistoricalCategory(section, errorType) {
   const sectionKey = normalizeLookup(section);
   const errorKey = normalizeLookup(errorType);
@@ -1778,6 +1809,7 @@ function mapHistoricalQreItem(errorType, categoryKey) {
     potency: "Potency Issue",
     "potency issue": "Potency Issue",
     "preparation quality": "Preparation Quality",
+    quantity: "Drug Errors",
     "receipt issue": "Receipt Issue",
     "wrong drug": "Drug Errors",
     "wrong ingredient amount": "Preparation Quality",
@@ -1803,7 +1835,9 @@ function mapHistoricalIssue(section, errorType) {
     "labeling issue": "Labeling",
     "packaging issue": "Packaging",
     payment: "Other: Payment",
+    "phone number": "Other: Phone number",
     "potency issue": "Potency",
+    quantity: "Quantity",
     refills: "Other: Refills",
     "wrong doctor": "Other: Wrong doctor",
     "wrong drug": "Drug",
