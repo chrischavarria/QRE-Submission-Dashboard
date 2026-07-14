@@ -1601,14 +1601,17 @@ async function readExcelRows(file) {
   const XLSX = await loadXlsxLibrary();
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) return [];
+  const sheetRows = workbook.SheetNames.map((sheetName) => {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      defval: "",
+      raw: false,
+      dateNF: "m/d/yyyy"
+    }).map((row) => normalizeHistoricalRow(row));
+    return { sheetName, rows };
+  });
 
-  return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
-    defval: "",
-    raw: false,
-    dateNF: "m/d/yyyy"
-  }).map((row) => normalizeHistoricalRow(row));
+  const importSheet = sheetRows.find(({ rows }) => rows.some(isHistoricalImportRow));
+  return importSheet?.rows || sheetRows[0]?.rows || [];
 }
 
 async function loadXlsxLibrary() {
@@ -1629,6 +1632,15 @@ function normalizeHistoricalRow(row) {
       : String(value ?? "").trim();
     return normalized;
   }, {});
+}
+
+function isHistoricalImportRow(row) {
+  return Boolean(
+    rowValue(row, "Date") &&
+    rowValue(row, "Notes") &&
+    rowValue(row, "Section") &&
+    rowValue(row, "Error Type")
+  );
 }
 
 function parseCsv(text) {
