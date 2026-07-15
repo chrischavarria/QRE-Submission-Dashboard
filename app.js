@@ -132,6 +132,7 @@ const els = {
   metricDepartmentFilter: document.querySelector("#metricDepartmentFilter"),
   metricPatientFilter: document.querySelector("#metricPatientFilter"),
   metricStaffFilter: document.querySelector("#metricStaffFilter"),
+  metricStaffNameFilter: document.querySelector("#metricStaffNameFilter"),
   metricNatureFilter: document.querySelector("#metricNatureFilter"),
   metricComplaintSourceFilter: document.querySelector("#metricComplaintSourceFilter"),
   metricOriginFilter: document.querySelector("#metricOriginFilter"),
@@ -275,6 +276,7 @@ function metricFilterElements() {
     els.metricDepartmentFilter,
     els.metricPatientFilter,
     els.metricStaffFilter,
+    els.metricStaffNameFilter,
     els.metricNatureFilter,
     els.metricComplaintSourceFilter,
     els.metricOriginFilter,
@@ -1402,6 +1404,7 @@ function getMetricFilters() {
     department: els.metricDepartmentFilter.value,
     patientInvolved: els.metricPatientFilter.value,
     staffInvolved: els.metricStaffFilter.value,
+    staffName: els.metricStaffNameFilter.value.trim(),
     nature: els.metricNatureFilter.value,
     complaintSource: els.metricComplaintSourceFilter.value,
     origin: els.metricOriginFilter.value,
@@ -1422,6 +1425,7 @@ function recordMatchesNonDateMetricFilters(record, filters) {
   if (filters.department && !filterValueMatches(record.department, filters.department)) return false;
   if (filters.patientInvolved && record.patient_involved !== filters.patientInvolved) return false;
   if (filters.staffInvolved && record.staff_involved !== filters.staffInvolved) return false;
+  if (filters.staffName && !fieldTextMatches(record.staff_names, filters.staffName)) return false;
   if (filters.nature && !arrayFilterMatches(record.nature, filters.nature)) return false;
   if (filters.complaintSource && recordComplaintSource(record) !== filters.complaintSource) return false;
   if (filters.origin && !filterValueMatches(record.origin_of_complaint, filters.origin)) return false;
@@ -1460,6 +1464,13 @@ function recordMatchesSearch(record, search) {
     QRE_CATEGORIES[record.qre_category]?.label
   ].join(" ").toLowerCase();
   return terms.every((term) => haystack.includes(term));
+}
+
+function fieldTextMatches(value, search) {
+  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const field = String(value || "").toLowerCase();
+  return terms.every((term) => field.includes(term));
 }
 
 function filterValueMatches(value, filter) {
@@ -1968,6 +1979,7 @@ function metricFilterSummary(filters) {
     department: filters.department,
     patientInvolved: filters.patientInvolved,
     staffInvolved: filters.staffInvolved,
+    staffName: filters.staffName,
     nature: filters.nature,
     complaintSource: filters.complaintSource,
     origin: filters.origin,
