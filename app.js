@@ -926,7 +926,9 @@ function renderPending() {
 }
 
 function renderApprovedArchive() {
-  const approved = state.records.filter((record) => record.status === "approved");
+  const approved = state.records
+    .filter((record) => record.status === "approved")
+    .sort((a, b) => archiveSortTime(b) - archiveSortTime(a));
   els.approvedCount.textContent = `${approved.length} approved`;
 
   if (!approved.length) {
@@ -943,6 +945,7 @@ function renderApprovedArchive() {
           <button class="record-select approved-select" data-id="${record.id}" type="button">
             <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
             <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.review_department || record.department || "")}</span>
+            <span>Approved ${escapeHtml(formatDateTime(record.reviewed_at) || "date unavailable")}</span>
             <span>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
           </button>
           ${deleteButton}
@@ -1183,6 +1186,12 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function archiveSortTime(record) {
+  const value = record.reviewed_at || record.created_at || record.event_date;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function selectedRecord() {
