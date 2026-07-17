@@ -557,6 +557,35 @@ legend {
   font-size: 12px;
 }
 
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.required-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.required-badge.subtle {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
 input,
 select,
 textarea {

@@ -111,28 +111,28 @@
               </div>
 
               <label>
-                Date
+                <span class="field-label">Date <span class="required-badge">Required</span></span>
                 <input name="event_date" type="date" required />
               </label>
               <label>
-                Time
+                <span class="field-label">Time <span class="required-badge">Required</span></span>
                 <input name="event_time" type="time" required />
               </label>
               <label>
-                Reported by
+                <span class="field-label">Reported by <span class="required-badge">Required</span></span>
                 <input name="reported_by" type="text" required />
               </label>
               <label>
-                Department
+                <span class="field-label">Department <span class="required-badge">Required</span></span>
                 <select name="department" required></select>
               </label>
               <label class="conditional-field hidden" data-other-field="department">
-                Other department
+                <span class="field-label">Other department <span class="required-badge subtle">Required if selected</span></span>
                 <input name="department_other" type="text" />
               </label>
 
               <fieldset>
-                <legend>Patient involved?</legend>
+                <legend>Patient involved? <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="patient_involved" type="radio" value="yes" required /> Yes</label>
                   <label><input name="patient_involved" type="radio" value="no" /> No</label>
@@ -143,7 +143,7 @@
                 <input name="patient_identifier" type="text" />
               </label>
               <fieldset>
-                <legend>Staff involved?</legend>
+                <legend>Staff involved? <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="staff_involved" type="radio" value="yes" required /> Yes</label>
                   <label><input name="staff_involved" type="radio" value="no" /> No</label>
@@ -158,25 +158,25 @@
                 <legend>Nature of variance</legend>
                 <div class="check-grid" data-checkboxes="nature"></div>
                 <label class="conditional-field hidden" data-other-field="nature">
-                  Other nature
+                  <span class="field-label">Other nature <span class="required-badge subtle">Required if selected</span></span>
                   <input name="nature_other" type="text" />
                 </label>
               </fieldset>
 
               <fieldset class="wide">
-                <legend>Source of complaint</legend>
+                <legend>Source of complaint <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="complaint_source" type="radio" value="Internal" required /> Internal</label>
                   <label><input name="complaint_source" type="radio" value="External" /> External</label>
                 </div>
                 <label class="conditional-field hidden" data-other-field="complaint_source_external">
-                  State shipped to
+                  <span class="field-label">State shipped to <span class="required-badge subtle">Required if external</span></span>
                   <select name="shipped_to_state"></select>
                 </label>
               </fieldset>
 
               <fieldset class="wide">
-                <legend>Origin of complaint</legend>
+                <legend>Origin of complaint <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="origin_of_complaint" type="radio" value="In-person" required /> In-person</label>
                   <label><input name="origin_of_complaint" type="radio" value="Phone" /> Phone</label>
@@ -185,13 +185,13 @@
                   <label><input name="origin_of_complaint" type="radio" value="Other" /> Other</label>
                 </div>
                 <label class="conditional-field hidden" data-other-field="origin_of_complaint">
-                  Other origin
+                  <span class="field-label">Other origin <span class="required-badge subtle">Required if selected</span></span>
                   <input name="origin_of_complaint_other" type="text" />
                 </label>
               </fieldset>
 
               <label class="wide">
-                Complainant(s)
+                <span class="field-label">Complainant(s) <span class="required-badge">Required</span></span>
                 <select name="complainants" required>
                   <option value="">Select complainant</option>
                   <option>Internal</option>
@@ -201,7 +201,7 @@
               </label>
 
               <fieldset>
-                <legend>Drug involved?</legend>
+                <legend>Drug involved? <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="drug_involved" type="radio" value="yes" required /> Yes</label>
                   <label><input name="drug_involved" type="radio" value="no" /> No</label>
@@ -213,7 +213,7 @@
                 <input name="drug_details" type="text" />
               </label>
               <fieldset>
-                <legend>Drug recalled?</legend>
+                <legend>Drug recalled? <span class="required-badge">Required</span></legend>
                 <div class="segmented">
                   <label><input name="drug_recalled" type="radio" value="yes" required /> Yes</label>
                   <label><input name="drug_recalled" type="radio" value="no" /> No</label>
@@ -225,7 +225,7 @@
                 <legend>Incorrect / issue with</legend>
                 <div class="check-grid" data-checkboxes="issue"></div>
                 <label class="conditional-field hidden" data-other-field="issue">
-                  Other issue
+                  <span class="field-label">Other issue <span class="required-badge subtle">Required if selected</span></span>
                   <input name="issue_other" type="text" />
                 </label>
               </fieldset>
@@ -234,13 +234,13 @@
                 <legend>Failure to identify and manage</legend>
                 <div class="check-grid" data-checkboxes="failure"></div>
                 <label class="conditional-field hidden" data-other-field="failure">
-                  Other failure
+                  <span class="field-label">Other failure <span class="required-badge subtle">Required if selected</span></span>
                   <input name="failure_other" type="text" />
                 </label>
               </fieldset>
 
               <label class="wide">
-                Issue / complaint
+                <span class="field-label">Issue / complaint <span class="required-badge">Required</span></span>
                 <textarea name="complaint" rows="4" required></textarea>
               </label>
               <label class="wide">
