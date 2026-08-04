@@ -1525,6 +1525,7 @@ function metricRecordCard(record) {
   const category = QRE_CATEGORIES[record.qre_category]?.label || "Approved variance";
   const issueText = listValue(record.issue) || "No issue selected";
   const patientIdentifier = record.patient_identifier || "N/A";
+  const staffNames = record.staff_names || "N/A";
   const complaint = record.complaint || "No issue / complaint entered";
   return `<div class="record-card${active}">
     <button class="record-select metric-record-select" data-id="${record.id}" type="button">
@@ -1534,6 +1535,7 @@ function metricRecordCard(record) {
       </div>
       <div class="metric-result-details">
         <span><b>Patient ID / Rx / Lot #</b>${escapeHtml(patientIdentifier)}</span>
+        <span><b>Staff Name(s)</b>${escapeHtml(staffNames)}</span>
         <span><b>Incorrect / issue with</b>${escapeHtml(issueText)}</span>
         <span><b>Metric</b>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
       </div>
