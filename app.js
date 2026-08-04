@@ -426,6 +426,7 @@ async function onSubmitVariance(event) {
 
   const payload = formToVariance(event.currentTarget);
   const editingRecord = state.records.find((record) => record.id === state.editingRecordId);
+  let postSubmitStatus = null;
 
   try {
     if (!state.supabase) {
@@ -438,10 +439,25 @@ async function onSubmitVariance(event) {
       const saved = await persistUpdate(editingRecord.id, update);
       if (!saved) return;
     } else {
-      const { error } = await state.supabase.from("variance_reports").insert(payload);
+      const shouldAutoApprove = isDataEntryOnlyVariance(payload);
+      const insertPayload = shouldAutoApprove ? autoApproveDataEntryPayload(payload) : payload;
+      const { data: insertedRecord, error } = await state.supabase
+        .from("variance_reports")
+        .insert(insertPayload)
+        .select("*")
+        .single();
       if (error) {
         showStatus(error.message, "error");
         return;
+      }
+      if (shouldAutoApprove && insertedRecord) {
+        const slackResult = await notifySlack({ type: "approved", record: insertedRecord });
+        if (!slackResult.ok) {
+          postSubmitStatus = {
+            message: `Data Entry variance was auto-approved, but Slack notification was not sent: ${slackResult.reason}.`,
+            tone: "warning"
+          };
+        }
       }
       await loadRecords();
     }
@@ -454,6 +470,12 @@ async function onSubmitVariance(event) {
     state.isSubmittingVariance = false;
     if (wasEditing) {
       showStatus("Submission changes saved. Continue with pharmacist review.", "success", { persist: true });
+    } else if (postSubmitStatus) {
+      setVarianceSubmitState("submitted");
+      showStatus(postSubmitStatus.message, postSubmitStatus.tone, { persist: true });
+    } else if (isDataEntryOnlyVariance(payload)) {
+      setVarianceSubmitState("submitted");
+      showStatus("Data Entry variance submitted and auto-approved.", "success", { persist: true });
     } else {
       setVarianceSubmitState("submitted");
       showStatus("Variance submitted successfully. It is now in Pharmacist Review.", "success", { persist: true });
@@ -582,6 +604,25 @@ function formToVariance(form) {
     completed_by: data.get("completed_by"),
     status: "pending",
     submitted_by: state.user?.id || null
+  };
+}
+
+function isDataEntryOnlyVariance(record) {
+  return Array.isArray(record.issue) && record.issue.length === 1 && record.issue[0] === "Data Entry";
+}
+
+function autoApproveDataEntryPayload(payload) {
+  return {
+    ...payload,
+    status: "approved",
+    qre_category: "internal",
+    qre_items: ["Drug Errors"],
+    review_department: payload.department || "",
+    pharmacist_name: "Auto-approved: Data Entry",
+    pharmacist_notes: "Auto-approved because Data Entry was the only selected Incorrect / issue with value.",
+    documentation_complete: "yes",
+    reviewed_by: null,
+    reviewed_at: new Date().toISOString()
   };
 }
 
