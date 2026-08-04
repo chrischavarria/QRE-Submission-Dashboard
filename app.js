@@ -1523,11 +1523,21 @@ function renderMetricDrilldown(records, label) {
 function metricRecordCard(record) {
   const active = record.id === state.selectedMetricRecordId ? " active" : "";
   const category = QRE_CATEGORIES[record.qre_category]?.label || "Approved variance";
+  const issueText = listValue(record.issue) || "No issue selected";
+  const patientIdentifier = record.patient_identifier || "N/A";
+  const complaint = record.complaint || "No issue / complaint entered";
   return `<div class="record-card${active}">
     <button class="record-select metric-record-select" data-id="${record.id}" type="button">
-      <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
-      <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.department || "")}</span>
-      <span>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
+      <div class="metric-result-card-header">
+        <strong>${escapeHtml(record.reported_by || "Unassigned")}</strong>
+        <span>${escapeHtml(record.event_date || "")} - ${escapeHtml(record.department || "")}</span>
+      </div>
+      <div class="metric-result-details">
+        <span><b>Patient ID / Rx / Lot #</b>${escapeHtml(patientIdentifier)}</span>
+        <span><b>Incorrect / issue with</b>${escapeHtml(issueText)}</span>
+        <span><b>Metric</b>${escapeHtml(category)} - ${escapeHtml(listValue(record.qre_items) || "No metric selected")}</span>
+      </div>
+      <span class="metric-result-complaint"><b>Issue / Complaint</b>${escapeHtml(complaint)}</span>
     </button>
   </div>`;
 }
