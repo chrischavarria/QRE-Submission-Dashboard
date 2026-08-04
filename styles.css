@@ -993,7 +993,7 @@ textarea {
 }
 
 .metric-record-list {
-  max-height: 460px;
+  max-height: 760px;
   overflow: auto;
 }
 
