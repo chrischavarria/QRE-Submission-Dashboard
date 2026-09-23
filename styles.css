@@ -998,11 +998,15 @@ textarea {
 }
 
 .metric-record-list .record-card {
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 .metric-record-list .record-select {
   gap: 10px;
+}
+
+.metric-record-list .delete-metric-record {
+  flex: 0 0 auto;
 }
 
 .metric-result-card-header {

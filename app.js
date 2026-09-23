@@ -738,6 +738,8 @@ async function deleteSubmission(id) {
   await loadRecords();
 
   if (state.selectedRecordId === id) state.selectedRecordId = null;
+  if (state.selectedApprovedId === id) state.selectedApprovedId = null;
+  if (state.selectedMetricRecordId === id) state.selectedMetricRecordId = null;
   render();
   showStatus("Submission deleted.", "success");
 }
@@ -1558,6 +1560,10 @@ function renderMetricDrilldown(records, label) {
     });
   });
 
+  els.metricResultList.querySelectorAll(".delete-metric-record").forEach((button) => {
+    button.addEventListener("click", () => deleteSubmission(button.dataset.id));
+  });
+
   renderSelectedMetricRecord();
 }
 
@@ -1568,6 +1574,9 @@ function metricRecordCard(record) {
   const patientIdentifier = record.patient_identifier || "N/A";
   const staffNames = record.staff_names || "N/A";
   const complaint = record.complaint || "No issue / complaint entered";
+  const deleteButton = state.profile?.role === "admin"
+    ? `<button class="danger-button delete-metric-record" data-id="${record.id}" type="button">Delete</button>`
+    : "";
   return `<div class="record-card${active}">
     <button class="record-select metric-record-select" data-id="${record.id}" type="button">
       <div class="metric-result-card-header">
@@ -1582,6 +1591,7 @@ function metricRecordCard(record) {
       </div>
       <span class="metric-result-complaint"><b>Issue / Complaint</b>${escapeHtml(complaint)}</span>
     </button>
+    ${deleteButton}
   </div>`;
 }
 
